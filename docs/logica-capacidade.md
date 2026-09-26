@@ -195,3 +195,56 @@ Para ter a **visão diária**: guardar o calendário por dia (horas × turnos) e
 por dia. A demanda diária pode vir da base de quarentena, ou ser distribuída a partir
 da semanal pelos dias úteis. Com isso, mês e semana passam a ser só agregações do dia,
 e o FIFO/HEIJUNKA sai direto do cálculo, sem a constante 22,97.
+
+---
+
+## 6. Decisões do negócio (implementadas em `capacidade/motor.py`)
+
+| # | Ponto | Decisão | Onde |
+|---|---|---|---|
+| 1 | Salto com `nCamp = 1` | Inconsistência. O **1º lote de cada campanha tem tempo cheio** e os demais usam o % da etapa, inclusive quando tudo cabe em uma campanha. As etapas sem % são cobradas por lote. | `Regras.campanha_corrigida` |
+| 2 | Constante 22,97 no FIFO | Usar os **dias úteis do período** do calendário: dias úteis da semana na visão semanal, média dos dias úteis dos meses na visão mensal. | `Regras.fifo_dias_uteis_calendario` |
+| 3 | Critério de skip | Uma regra só: **skip = teste de impureza (família "Impureza Skip Test") de MPR que está na Tabela_SKIP_IMP**. | `Regras.skip_pela_tabela` |
+| 4 | Média do intervalo esconde picos | Calcular capacidade e demanda **mês a mês** (ou semana a semana), mostrar o saldo de cada período e destacar o **pior mês**. | `mes_a_mes()`, `pior_periodo()` |
+| — | Visão diária | Adiada: não existe demanda diária confiável. | — |
+| — | Pergunta ao contrário | "Quanto consigo atender com os recursos que tenho?" | coluna `DEMANDA MAX`, `capacidade_maxima()` |
+
+Sobre a regra 3: aplicar o skip a **todas** as linhas do MPR (ao pé da letra "MPR na
+tabela") também pularia dissolução, teor, umidade etc., e cortaria cerca de 4.100 h/mês
+de carga. Por isso a tabela é usada para **confirmar** o skip do teste de impureza. Nos
+dados atuais, todas as linhas "Impureza Skip Test" já têm o MPR na tabela, então as
+duas regras antigas davam o mesmo resultado.
+
+Sobre a regra 1: com demanda média fracionada (ex.: 0,5 lote/mês), o nº de "primeiros
+lotes" é limitado a `min(nCamp, lotes)`. Assim, meio lote paga meio tempo cheio, e não
+um tempo cheio inteiro.
+
+Efeito das correções: na média anual a regra 1 muda pouco (+6 h/mês), porque em 12 meses
+quase todo MPR tem 2+ campanhas. **No mês a mês ela pesa bem mais**: cada mês abre
+campanhas novas, e a carga anual somada mês a mês fica em torno de 339 mil h, contra
+325 mil h pela média.
+
+## 7. Validação da réplica em Python
+
+- **A aba CAP_PROPOSTA salva no arquivo está desatualizada.** Ela usa, por exemplo,
+  518 h/turno e 1,91 pessoas em Dermo, enquanto a aba FAMÍLIAS atual tem 524,9 h e 1,62.
+  Por isso a comparação direta não serve. Após "Dados → Atualizar Tudo" no Excel, basta
+  exportar de novo (`python -m capacidade.extrair_excel`) e comparar.
+- A validação foi feita contra as **colunas de fórmula da BASE TC**, que recalculam na
+  hora:
+  - lotes por linha (`LOTES PROGRAMADOS`): **4.707 de 4.707 iguais**;
+  - MO Bancada, Conferência Bancada, Conferência PI/TF, Revisão Final, MO Equip.
+    Bancada e Dissolutor: **totais idênticos**;
+  - MO Equipamento, Conferência Equipamento e HPLC/CG: as colunas de fórmula dão
+    exatamente 1/6, 1/12 e 1/5 do valor das queries, em **todas** as linhas. A lógica
+    (campanha, skip) é a mesma e só a escala das colunas antigas difere. O CAP_PROPOSTA
+    usa as queries, e a réplica segue as queries.
+
+## 8. Alertas de cadastro encontrados
+
+Estes itens somem do cálculo, tanto no Excel quanto no Python:
+
+- 8 MPRs com tempo de corrida HPLC/CG e **sem "Equipamento Proposto"**: MPD00359,
+  MPD00721, MPR01321, MPR01372, MPR01422, MPR01424, MPR01487, MPR01488.
+- 294 lotes/ano de códigos com **"Método não encontrado"** (sem MPR).
+- CRLQ0072 sem CLUSTER na aba FAMÍLIAS.
