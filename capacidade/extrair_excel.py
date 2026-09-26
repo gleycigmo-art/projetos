@@ -94,11 +94,45 @@ def ler_tabelas(caminho):
     return saida
 
 
+def ler_blocos_familias(caminho):
+    """Blocos soltos da aba FAMÍLIAS (fora das tabelas): ausências e peso dos dias úteis."""
+    with open_workbook(caminho) as wb:
+        with wb.get_sheet("FAMÍLIAS") as sh:
+            celulas = {(c.r, c.c): c.v for row in sh.rows() for c in row if c.v not in (None, "")}
+    pos = {v.strip(): k for k, v in celulas.items() if isinstance(v, str)}
+    blocos = {}
+
+    if "P/D" in pos:
+        r0, c0 = pos["P/D"]
+        cab_sem = str(celulas.get((r0 - 1, c0 + 1), "Semana"))
+        sem = re.search(r"(\d+)", cab_sem)
+        linhas, r = [], r0
+        while isinstance(celulas.get((r, c0)), str):
+            tipo = celulas[(r, c0)].strip().rstrip(":")
+            linhas.append((tipo, celulas.get((r, c0 + 1)), celulas.get((r, c0 + 2))))
+            r += 1
+        df = pd.DataFrame(linhas, columns=["TIPO", "QTDE_SEMANA", "QTDE_MEDIA_ANO"])
+        df["SEMANA_REF"] = int(sem.group(1)) if sem else None
+        blocos["ausencias"] = df
+
+    if "Dia útil" in pos:
+        r0, c0 = pos["Dia útil"]
+        linhas = []
+        for r in range(r0 + 1, r0 + 8):
+            dia = celulas.get((r, c0 - 1))
+            if isinstance(dia, str):
+                linhas.append((dia.strip(), celulas.get((r, c0))))
+        blocos["dia_util"] = pd.DataFrame(linhas, columns=["DIA", "PESO"])
+    return blocos
+
+
 def main():
     caminho = sys.argv[1]
     destino = sys.argv[2] if len(sys.argv) > 2 else "dados"
     os.makedirs(destino, exist_ok=True)
-    for nome, df in ler_tabelas(caminho).items():
+    tabelas = ler_tabelas(caminho)
+    tabelas.update(ler_blocos_familias(caminho))
+    for nome, df in tabelas.items():
         df.to_csv(os.path.join(destino, f"{nome}.csv"), index=False, encoding="utf-8")
         print(f"{nome:22s} {df.shape[0]:5d} linhas x {df.shape[1]:3d} colunas")
 

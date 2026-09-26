@@ -32,3 +32,30 @@ sim = cap_proposta(d, cenario=Cenario(
     pessoas={"Sólidos - Neolefrin": 3.0}))                  # 3 pessoas/turno
 capacidade_maxima(d)                                        # quanto a MO aguenta
 ```
+
+## FLOW LAB (app web)
+
+Painel de capacidade semanal e mensal em um único arquivo HTML: `app/dist/flow-lab.html`.
+Abra direto no navegador; não precisa de servidor.
+
+| Tela | O que mostra |
+|---|---|
+| Painel executivo | 8 KPIs, carregamento por família, resumo copiável, insights |
+| Mapa de capacidade | tabela por família/processo, filtro por cluster, marcação de intercambiáveis |
+| Gargalos | matriz doadoras × receptoras, ranking de gap de HC, Pareto, equipamentos > 100% |
+| Mão de obra | HC por turno e balanceamento, ausências, HC efetivo, quadro por família |
+| Complexidade | índice ponderado, % 3+4, distribuição por nível |
+| Tendências | evolução período a período, pior período, gargalo crônico, mapa de calor |
+| Simulador | OEE (MO e equipamentos), demanda, remanejamento, quadro, ausências, lotes adiados; antes × depois e "quanto consigo atender" |
+| Importação | lê a planilha MFV (.xlsb) no navegador, valida e recalcula tudo; parâmetros e alertas de cadastro |
+
+- **Semana × mês:** seletor no topo. A semana 38 usa a quarentena real; as demais
+  semanas usam a projeção do plano mensal, rateada pelos pesos de dia útil da aba FAMÍLIAS.
+- **Regras:** corrigidas por padrão; em Importação dá para alternar para "Legado (Excel)".
+- **Motor:** `app/src/engine.js` é a porta de `capacidade/motor.py`, e o teste de
+  paridade garante os mesmos números.
+
+```bash
+python app/build.py            # gera app/dist/flow-lab.html e o gabarito de testes
+node --test app/test/          # paridade JS × Python e regras do simulador
+```
