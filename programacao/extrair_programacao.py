@@ -1,10 +1,16 @@
-"""Converte a planilha "Status + Programação" em tabelas normalizadas (CSV).
+"""Converte a planilha "Status + Programação" em tabelas normalizadas.
 
-Cada aba "Fam ..." é uma pilha de blocos, um por produto. Cada bloco tem:
+Cada aba "Fam ..." é uma pilha de blocos, um por grupo de produto. Cada bloco tem:
   - linha de cabeçalho (Entrada CQ, Código, Produto, Lote PA, Lote PI, ..., testes)
-  - linha "Padrão" (status do padrão de referência de cada teste)
+  - linha "Padrão": preparo de padrão e fase móvel de cada teste do grupo
   - linhas de lote (SA/granel com Lote PI e PA/acabado com Lote PA)
-Cada teste ocupa 3 colunas: Status | Prog. (turno 1/2/3 ou "s") | Backup.
+Cada teste ocupa 3 colunas: Status | Prog. | Backup
+  - Prog.  : 1 = programado
+  - Backup : retorno de quem executou — 1 = feito, C = continuidade no próximo turno, N = não feito
+  - "s" nas duas colunas = marcação antiga de teste já concluído
+
+Saída: um CSV por tabela e `carga_powerapps.xlsx` (uma aba/tabela por entidade,
+pronta para importar em Dataverse ou listas do SharePoint).
 
 Uso:
     python -m programacao.extrair_programacao "Status + Programação V0.xlsx" dados_programacao
@@ -16,11 +22,13 @@ from datetime import date, datetime
 from pathlib import Path
 
 import openpyxl
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 IGNORAR_TESTES = {"OBSERVAÇÃO", ""}
 STATUS_CONCLUIDO = {
     "APROVADO", "N/A", "FEITO NO PI - OK", "FEITO NA VALIDAÇÃO", "PEGAR DO COA",
 }
+RETORNO = {"1": "Feito", "C": "Continuidade", "N": "Não feito"}
 
 
 def _txt(v):
@@ -35,12 +43,12 @@ def _txt(v):
     return str(v).strip()
 
 
-def _turno(v):
-    """Coluna Prog./Backup: 1, 2, 3 (ou "2-") = turno; "s" = feito."""
-    t = _txt(v).upper().rstrip("-").strip()
-    if t in ("1", "2", "3"):
-        return t, ""
-    return "", "s" if t == "S" else t
+def _prog_backup(prog, backup):
+    """Traduz o par Prog./Backup em (programado, retorno, códigos originais)."""
+    p, b = _txt(prog).upper(), _txt(backup).upper()
+    programado = "Sim" if p in ("1", "2-") else ""
+    retorno = RETORNO.get(b, "")
+    return programado, retorno, p, b
 
 
 def _eh_cabecalho(ws, r):
@@ -48,39 +56,51 @@ def _eh_cabecalho(ws, r):
 
 
 def extrair_familias(wb):
-    lotes, analises, padroes, alocacao = [], [], [], []
+    grupos, catalogo, lotes, analises, preparos = [], [], [], [], []
     for ws in wb.worksheets:
         familia = ws.title.strip()
         if not familia.startswith("Fam"):
             continue
-        testes, bloco = None, 0
+        testes, grupo = None, None
         for r in range(1, ws.max_row + 1):
             cel = lambda c: ws.cell(r, c).value  # noqa: E731
             if _eh_cabecalho(ws, r):
-                bloco += 1
                 testes = {}
                 for c in range(13, ws.max_column + 1):
                     nome = _txt(ws.cell(r, c).value)
                     if nome.upper() not in IGNORAR_TESTES:
                         testes[c] = nome
+                grupo = dict(grupo_id=f"{familia} #{len(grupos) + 1:03d}", familia=familia,
+                             linha=r, produto_referencia="", codigos="")
+                grupos.append(grupo)
+                for ordem, nome in enumerate(testes.values(), start=1):
+                    catalogo.append(dict(grupo_id=grupo["grupo_id"], familia=familia,
+                                         ordem=ordem, teste=nome))
                 continue
             if testes is None:
                 continue
             produto = _txt(cel(6))
             if produto == "Padrão":
                 for c, nome in testes.items():
-                    if _txt(cel(c)):
-                        padroes.append(dict(familia=familia, bloco=bloco, teste=nome,
-                                            status=_txt(cel(c)).upper()))
+                    status = _txt(cel(c)).upper()
+                    programado, retorno, p, b = _prog_backup(cel(c + 1), cel(c + 2))
+                    if status or programado:
+                        preparos.append(dict(grupo_id=grupo["grupo_id"], familia=familia,
+                                             teste=nome, status=status, programado=programado,
+                                             retorno=retorno, prog_original=p, backup_original=b))
                 continue
             if not produto or not (_txt(cel(7)) or _txt(cel(8))):
                 continue
             lote_pa, lote_pi = _txt(cel(7)), _txt(cel(8))
             lote_id = lote_pa or lote_pi
-            obs = _txt(ws.cell(r, max(testes) + 3).value) if testes else ""
+            codigo = _txt(cel(5))
+            if not grupo["produto_referencia"]:
+                grupo["produto_referencia"] = produto
+            if codigo and codigo not in grupo["codigos"].split(", "):
+                grupo["codigos"] = ", ".join(filter(None, [grupo["codigos"], codigo]))
             lotes.append(dict(
-                familia=familia, bloco=bloco, linha=r, lote=lote_id,
-                tipo="PA" if lote_pa else "SA", codigo=_txt(cel(5)), produto=produto,
+                lote=lote_id, familia=familia, grupo_id=grupo["grupo_id"], linha=r,
+                tipo="PA" if lote_pa else "SA", codigo=codigo, produto=produto,
                 lote_pa=lote_pa, lote_pi=lote_pi, entrada_cq=_txt(cel(4)),
                 dias_cq=_txt(cel(9)), data_lib_prevista=_txt(cel(10)),
                 cluster_inicial=_txt(cel(11)), cluster_atual=_txt(cel(12)),
@@ -88,22 +108,19 @@ def extrair_familias(wb):
             ))
             for c, nome in testes.items():
                 status = _txt(cel(c)).upper()
-                if not status:
+                programado, retorno, p, b = _prog_backup(cel(c + 1), cel(c + 2))
+                if not status and not programado:
                     continue
-                turno_prog, prog = _turno(cel(c + 1))
-                turno_bk, bk = _turno(cel(c + 2))
                 analises.append(dict(
-                    familia=familia, lote=lote_id, tipo="PA" if lote_pa else "SA",
+                    analise_id=f"{lote_id}|{nome}", lote=lote_id, familia=familia,
+                    grupo_id=grupo["grupo_id"], tipo="PA" if lote_pa else "SA",
                     lote_pi=lote_pi, teste=nome, status=status,
-                    concluido="s" if status in STATUS_CONCLUIDO else "",
-                    turno_programado=turno_prog, prog_ok=prog,
-                    turno_backup=turno_bk, backup_ok=bk,
+                    concluido="Sim" if status in STATUS_CONCLUIDO else "",
+                    programado=programado, retorno=retorno,
+                    prog_original=p, backup_original=b,
                     comentario=(ws.cell(r, c).comment.text.strip() if ws.cell(r, c).comment else ""),
                 ))
-            for t, c in (("1", 1), ("2", 2), ("3", 3)):
-                if _txt(cel(c)):
-                    alocacao.append(dict(familia=familia, lote=lote_id, turno=t, analista=_txt(cel(c))))
-    return lotes, analises, padroes, alocacao
+    return grupos, catalogo, lotes, analises, preparos
 
 
 def extrair_escala(wb):
@@ -147,36 +164,64 @@ def extrair_dissolucao(wb):
     return out
 
 
-def _salvar(pasta, nome, linhas):
-    if not linhas:
-        return
-    campos = list(dict.fromkeys(k for l in linhas for k in l))
-    with open(pasta / nome, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=campos, delimiter=";")
+def _campos(linhas):
+    return list(dict.fromkeys(k for l in linhas for k in l))
+
+
+def _salvar_csv(pasta, nome, linhas):
+    with open(pasta / f"{nome}.csv", "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=_campos(linhas), delimiter=";")
         w.writeheader()
         w.writerows(linhas)
+
+
+def _salvar_xlsx(caminho, tabelas):
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    for nome, linhas in tabelas.items():
+        ws = wb.create_sheet(nome)
+        campos = _campos(linhas)
+        ws.append(campos)
+        for l in linhas:
+            ws.append([l.get(k, "") for k in campos])
+        ref = f"A1:{openpyxl.utils.get_column_letter(len(campos))}{len(linhas) + 1}"
+        tab = Table(displayName=f"tb{nome.title().replace('_', '')}", ref=ref)
+        tab.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
+        ws.add_table(tab)
+        for i, k in enumerate(campos, start=1):
+            ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = max(12, min(40, len(k) + 4))
+    wb.save(caminho)
 
 
 def main(arquivo, pasta_saida):
     wb = openpyxl.load_workbook(arquivo, data_only=True)
     pasta = Path(pasta_saida)
     pasta.mkdir(parents=True, exist_ok=True)
-    lotes, analises, padroes, alocacao = extrair_familias(wb)
+    grupos, catalogo, lotes, analises, preparos = extrair_familias(wb)
     tabelas = {
-        "lotes.csv": lotes,
-        "analises.csv": analises,
-        "padroes.csv": padroes,
-        "alocacao_lote.csv": alocacao,
-        "escala.csv": extrair_escala(wb),
-        "equipamentos.csv": extrair_equipamentos(wb),
-        "programacao_dissolucao.csv": extrair_dissolucao(wb),
+        "grupos": grupos,
+        "catalogo_testes": catalogo,
+        "lotes": lotes,
+        "analises": analises,
+        "preparo_padrao": preparos,
+        "escala": extrair_escala(wb),
+        "equipamentos": extrair_equipamentos(wb),
+        "programacao_dissolucao": extrair_dissolucao(wb),
     }
     for nome, linhas in tabelas.items():
-        _salvar(pasta, nome, linhas)
-        print(f"{nome:28s} {len(linhas):5d} linhas")
+        _salvar_csv(pasta, nome, linhas)
+        print(f"{nome:24s} {len(linhas):5d} linhas")
+    _salvar_xlsx(pasta / "carga_powerapps.xlsx", tabelas)
+
     pend = [a for a in analises if not a["concluido"]]
-    print(f"\n{len(lotes)} lotes, {len(analises)} análises, {len(pend)} pendentes, "
-          f"{sum(1 for a in pend if a['turno_programado'])} programadas para um turno")
+    prog = [a for a in analises if a["programado"]]
+    ret = [a for a in prog if a["retorno"]]
+    print(f"\n{len(lotes)} lotes, {len(analises)} análises, {len(pend)} pendentes")
+    print(f"programadas: {len(prog)} | com retorno: {len(ret)} "
+          f"(feito {sum(a['retorno'] == 'Feito' for a in ret)}, "
+          f"continuidade {sum(a['retorno'] == 'Continuidade' for a in ret)}, "
+          f"não feito {sum(a['retorno'] == 'Não feito' for a in ret)})")
+    print(f"preparos de padrão/FM programados: {sum(1 for p in preparos if p['programado'])}")
 
 
 if __name__ == "__main__":
