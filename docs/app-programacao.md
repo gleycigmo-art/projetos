@@ -259,10 +259,12 @@ referência para TC e HC.
 
 ---
 
-## 7. Perguntas ainda abertas
+## 7. Decisões tomadas
 
-1. **`2-` na coluna Prog.**: é "programado para o 2º turno"? A programação é sempre para o turno seguinte ou pode ser para vários turnos à frente?
-2. **Quem programa**: um líder por turno para todas as famílias, ou cada família programa a sua?
-3. **QUARENTENA**: onde fica o Excel (SharePoint, OneDrive, rede)? Tem tabela formatada? Com que frequência é atualizado? (Define se o fluxo de dados roda de hora em hora ou por turno.)
-4. **Licença**: vocês têm Power Apps Premium, ou só as licenças do M365? E usam Teams? (Define Dataverse × Dataverse for Teams.)
-5. **Família piloto**: qual família começar? Sugestão: uma com volume médio e bastante programação hoje (Losartana ou Torsilax).
+| Tema | Decisão |
+|---|---|
+| `2-` na coluna Prog. | Programado para o 2º turno |
+| Quem programa | Um programador único programa os três turnos → a tela **Programar** é a principal; os analistas usam **Meu turno** |
+| QUARENTENA | Excel na rede, atualizado o tempo todo → o fluxo de dados precisa de um **gateway de dados local** (on-premises data gateway) instalado por TI numa máquina que enxergue a pasta; atualização agendada a cada 1 h. Alternativa sem gateway: mover o arquivo para SharePoint/OneDrive. |
+| Licença | Não confirmada, mas já cria apps → começar com o que a licença permite e confirmar com TI se há Dataverse (Premium) ou só Dataverse for Teams |
+| Próximo passo | Protótipo navegável com dados reais: `prototipo/programacao-cq.html` |
