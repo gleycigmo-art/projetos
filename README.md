@@ -57,5 +57,5 @@ Abra direto no navegador; não precisa de servidor.
 
 ```bash
 python app/build.py            # gera app/dist/flow-lab.html e o gabarito de testes
-node --test app/test/          # paridade JS × Python e regras do simulador
+node --test app/test/*.test.mjs   # paridade JS × Python e regras do simulador
 ```
