@@ -45,9 +45,13 @@ Regras:
   enviado (com a célula) e o que não entrou (e por quê).
 - `DesfazerUltimoEnvio` apaga o que o último envio escreveu, exceto as células
   que a analista já alterou depois.
-- O `PAINEL - BANCADA` está protegido. A macro desprotege, escreve e protege de
-  novo com as mesmas permissões (formatar, classificar, filtrar). Se um dia
-  colocarem senha, preencha `SENHA_PAINEIS`.
+- O `PAINEL - BANCADA` está protegido **com senha**. Na primeira vez que precisar
+  escrever nele, a macro **pede a senha** (uma vez por clique), escreve e protege
+  de novo com a mesma senha e as mesmas permissões (formatar, classificar,
+  filtrar). Se a senha não for informada, o painel é pulado e os lotes aparecem
+  no log como "Painel protegido". Para não precisar digitar, preencha
+  `SENHA_PAINEIS` no topo do módulo; nesse caso, qualquer pessoa que abrir o
+  código verá a senha.
 
 ## Instalação (uma vez)
 
@@ -78,7 +82,7 @@ Regras:
 |---|---|---|
 | `DIAS_RETROATIVOS` | `0` | `0` = envia de hoje em diante; `2` = aceita até 2 dias atrás |
 | `ATUALIZAR_ROTAS_ANTES` | `False` | atualiza a consulta antes de enviar |
-| `SENHA_PAINEIS` | `""` | senha de proteção dos painéis, se houver |
+| `SENHA_PAINEIS` | `""` | senha dos painéis; vazio = a macro pergunta na hora |
 | `MapaFamilias()` | 9 famílias | família → painel → coluna de data. Família nova = uma linha nova aqui (o nome tem de ser igual ao da coluna B do painel) |
 
 ## Simulação com o arquivo atual (01/10/2026)

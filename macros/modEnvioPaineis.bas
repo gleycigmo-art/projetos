@@ -23,7 +23,9 @@ Private Const COL_DATA_CROMATO As String = "D+8 (-3 dias)"
 
 Private Const LINHA_CABECALHO As Long = 4      ' linha das datas nos painéis
 Private Const COL_FAMILIA As Long = 2          ' coluna B dos painéis
-Private Const SENHA_PAINEIS As String = ""     ' senha de proteção dos painéis (se houver)
+' Senha de proteção dos painéis. Se ficar vazia e o painel tiver senha,
+' a macro pergunta a senha na hora (uma vez por clique).
+Private Const SENHA_PAINEIS As String = ""
 
 ' Lotes com data anterior a (hoje - DIAS_RETROATIVOS) não são enviados.
 Private Const DIAS_RETROATIVOS As Long = 0
@@ -40,6 +42,7 @@ Private Const RES_DESFEITO As String = "Desfeito"
 
 Private mPaineis As Object      ' nome da aba -> informações do painel
 Private mLog As Collection
+Private mSenhaDigitada As String  ' senha informada pelo usuário nesta execução
 
 ' Família (cabeçalho em ROTAS E FAMILIAS) -> painel -> coluna de data usada.
 ' O nome da família deve ser igual ao da coluna B do painel.
@@ -111,6 +114,7 @@ Public Sub EnviarLotesParaPaineis()
 
     Set mPaineis = CreateObject("Scripting.Dictionary")
     Set mLog = New Collection
+    mSenhaDigitada = ""
     For j = LBound(mapa) To UBound(mapa)
         If Not mPaineis.Exists(CStr(mapa(j)(1))) Then
             mPaineis.Add CStr(mapa(j)(1)), PrepararPainel(ThisWorkbook.Worksheets(CStr(mapa(j)(1))))
@@ -199,7 +203,10 @@ Private Function EnviarLote(ByVal conc As String, ByVal familia As String, paine
     Set linhas = painel("blocos")(famU)
     For Each r In linhas
         If CelulaVazia(ws.Cells(CLng(r), col)) Then
-            DesprotegerPainel painel
+            If Not DesprotegerPainel(painel) Then
+                RegistrarLog "Painel protegido: senha não informada ou incorreta", ws.Name, familia, Format(CDate(d), "dd/mm/yyyy"), "", conc
+                Exit Function
+            End If
             ws.Cells(CLng(r), col).Value = conc
             painel("chaves").Item(chave) = True
             RegistrarLog RES_ENVIADO, ws.Name, familia, Format(CDate(d), "dd/mm/yyyy"), ws.Cells(CLng(r), col).Address(False, False), conc
@@ -236,6 +243,7 @@ Public Sub DesfazerUltimoEnvio()
               "(Células que a analista já alterou não são mexidas.)", vbQuestion + vbYesNo) = vbNo Then Exit Sub
 
     Set mPaineis = CreateObject("Scripting.Dictionary")
+    mSenhaDigitada = ""
     Application.ScreenUpdating = False
     For r = 2 To ultLin
         If wsLog.Cells(r, 2).Value = RES_ENVIADO Then
@@ -243,10 +251,13 @@ Public Sub DesfazerUltimoEnvio()
             Set cel = ws.Range(CStr(wsLog.Cells(r, 6).Value))
             If TextoCelula(cel.Value) = TextoCelula(wsLog.Cells(r, 7).Value) Then
                 If Not mPaineis.Exists(ws.Name) Then mPaineis.Add ws.Name, InfoProtecao(ws)
-                DesprotegerPainel mPaineis(ws.Name)
-                cel.ClearContents
-                wsLog.Cells(r, 2).Value = RES_DESFEITO
-                n = n + 1
+                If DesprotegerPainel(mPaineis(ws.Name)) Then
+                    cel.ClearContents
+                    wsLog.Cells(r, 2).Value = RES_DESFEITO
+                    n = n + 1
+                Else
+                    ignorados = ignorados + 1
+                End If
             Else
                 ignorados = ignorados + 1
             End If
@@ -256,7 +267,7 @@ Public Sub DesfazerUltimoEnvio()
     Application.ScreenUpdating = True
 
     MsgBox n & " lote(s) removido(s) dos painéis." & _
-           IIf(ignorados > 0, vbLf & ignorados & " célula(s) já tinham sido alteradas e foram mantidas.", ""), vbInformation
+           IIf(ignorados > 0, vbLf & ignorados & " célula(s) mantida(s) (já alteradas ou painel sem senha).", ""), vbInformation
 End Sub
 
 
@@ -278,6 +289,7 @@ Public Sub ConverterFormulasEmValores()
     Next j
 
     Set mPaineis = CreateObject("Scripting.Dictionary")
+    mSenhaDigitada = ""
     Application.ScreenUpdating = False
     For Each nome In nomes.Keys
         Set ws = ThisWorkbook.Worksheets(CStr(nome))
@@ -290,7 +302,12 @@ Public Sub ConverterFormulasEmValores()
             Set formulas = area.SpecialCells(xlCellTypeFormulas)
             On Error GoTo 0
             If Not formulas Is Nothing Then
-                DesprotegerPainel info
+                If Not DesprotegerPainel(info) Then
+                    MsgBox "As fórmulas do " & ws.Name & " não foram convertidas (senha não informada).", vbExclamation
+                    Set formulas = Nothing
+                End If
+            End If
+            If Not formulas Is Nothing Then
                 For Each cel In formulas.Cells
                     If cel.HasArray Then
                         cel.CurrentArray.Value = cel.CurrentArray.Value
@@ -387,24 +404,67 @@ Private Function InfoProtecao(ws As Worksheet) As Object
     info.Add "wsProt", ws
     info.Add "protegida", ws.ProtectContents
     info.Add "desprotegida", False
+    info.Add "recusada", False
+    info.Add "senha", ""
     Set InfoProtecao = info
 End Function
 
-Private Sub DesprotegerPainel(info As Object)
-    If info("protegida") And Not info("desprotegida") Then
-        info("wsProt").Unprotect Password:=SENHA_PAINEIS
-        info("desprotegida") = True
-    End If
-End Sub
+' Desprotege o painel antes de escrever. Tenta a SENHA_PAINEIS, depois a senha
+' já digitada neste clique e, se nenhuma servir, pergunta ao usuário.
+' Retorna False se não conseguir (o painel é pulado, sem travar o envio).
+Private Function DesprotegerPainel(info As Object) As Boolean
+    Dim ws As Worksheet, senha As String, tentativa As Long
 
-' Protege de novo com as mesmas permissões que o PAINEL - BANCADA usa hoje.
+    If Not info("protegida") Or info("desprotegida") Then
+        DesprotegerPainel = True
+        Exit Function
+    End If
+    If info("recusada") Then Exit Function
+
+    Set ws = info("wsProt")
+    If TentarDesproteger(ws, SENHA_PAINEIS) Then
+        senha = SENHA_PAINEIS
+    ElseIf mSenhaDigitada <> "" And TentarDesproteger(ws, mSenhaDigitada) Then
+        senha = mSenhaDigitada
+    Else
+        Application.ScreenUpdating = True
+        For tentativa = 1 To 3
+            senha = InputBox("A aba """ & ws.Name & """ está protegida com senha." & vbLf & vbLf & _
+                             "Digite a senha para a macro poder escrever os lotes" & _
+                             IIf(tentativa > 1, " (senha incorreta, tentativa " & tentativa & " de 3)", "") & ":", _
+                             "Senha do painel")
+            If senha = "" Then Exit For
+            If TentarDesproteger(ws, senha) Then Exit For
+            senha = ""
+        Next tentativa
+        Application.ScreenUpdating = False
+        If senha = "" Then
+            info("recusada") = True
+            Exit Function
+        End If
+        mSenhaDigitada = senha
+    End If
+
+    info("senha") = senha
+    info("desprotegida") = True
+    DesprotegerPainel = True
+End Function
+
+Private Function TentarDesproteger(ws As Worksheet, ByVal senha As String) As Boolean
+    On Error Resume Next
+    ws.Unprotect Password:=senha
+    TentarDesproteger = (Err.Number = 0 And Not ws.ProtectContents)
+    Err.Clear
+End Function
+
+' Protege de novo, com a mesma senha, e com as permissões que o PAINEL - BANCADA usa hoje.
 Private Sub ReprotegerPaineis()
     Dim k As Variant, info As Object
     If mPaineis Is Nothing Then Exit Sub
     For Each k In mPaineis.Keys
         Set info = mPaineis(k)
         If info("desprotegida") Then
-            info("wsProt").Protect Password:=SENHA_PAINEIS, DrawingObjects:=False, Contents:=True, Scenarios:=False, _
+            info("wsProt").Protect Password:=CStr(info("senha")), DrawingObjects:=False, Contents:=True, Scenarios:=False, _
                 AllowFormattingCells:=True, AllowFormattingColumns:=True, AllowFormattingRows:=True, _
                 AllowSorting:=True, AllowFiltering:=True
             info("desprotegida") = False
