@@ -41,11 +41,16 @@ Regras:
 - **Pinta de cinza claro** (cor da legenda "Prog. em andamento", célula D2 do
   painel) cada célula preenchida pela macro. Assim a analista vê o que veio
   automático e troca a cor conforme ajusta. Desligue com `PINTAR_ENVIADOS = False`.
-- **Ignora datas passadas** (configurável em `DIAS_RETROATIVOS`).
+- **Programa só de hoje em diante** (`DIAS_RETROATIVOS = 0`). Lotes com data
+  passada que **não estão no painel** não são enviados, mas aparecem no LOG ENVIO
+  como "Data já passou: não enviado", para a analista decidir o que fazer.
 - **Bloco cheio:** se as 9 vagas da data estão ocupadas, o lote não entra e aparece
   no log como "Sem vaga", para a analista decidir onde colocar.
-- Ao final, mostra um resumo e grava o detalhe na aba **LOG ENVIO**: o que foi
-  enviado (com a célula) e o que não entrou (e por quê).
+- Ao final, mostra um resumo e grava, lote a lote, na aba **LOG ENVIO** o que foi
+  enviado (com a célula) e o que não entrou e por quê. A coluna Resultado é
+  colorida: **verde** = enviado, **amarelo** = data passada, **vermelho** = sem
+  vaga / sem data / data ou família não encontrada no painel. O cabeçalho tem
+  filtro.
 - `DesfazerUltimoEnvio` desfaz **um envio por clique**, do mais recente para o
   mais antigo. Apaga as células que aquele envio escreveu e devolve a cor
   anterior. Lotes que a analista já moveu ou editou são mantidos e marcados no
