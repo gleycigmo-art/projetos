@@ -46,8 +46,12 @@ Regras:
   no log como "Sem vaga", para a analista decidir onde colocar.
 - Ao final, mostra um resumo e grava o detalhe na aba **LOG ENVIO**: o que foi
   enviado (com a célula) e o que não entrou (e por quê).
-- `DesfazerUltimoEnvio` apaga o que o último envio escreveu, exceto as células
-  que a analista já alterou depois, e devolve a cor que a célula tinha antes.
+- `DesfazerUltimoEnvio` desfaz **um envio por clique**, do mais recente para o
+  mais antigo. Apaga as células que aquele envio escreveu e devolve a cor
+  anterior. Lotes que a analista já moveu ou editou são mantidos e marcados no
+  log como "Não desfeito". O log **acumula** os últimos 30 envios (o mais
+  recente no topo, coluna **Envio** = data/hora do clique). Um clique em
+  "Enviar lotes" que não envia nada não apaga o histórico.
 - O `PAINEL - BANCADA` está protegido **com senha**. Na primeira vez que precisar
   escrever nele, a macro **pede a senha** (uma vez por clique), escreve e protege
   de novo com a mesma senha e as mesmas permissões (formatar, classificar,

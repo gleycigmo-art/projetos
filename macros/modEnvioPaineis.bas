@@ -48,9 +48,12 @@ Private Const COR_AUTO_PADRAO As Long = 12566463   ' RGB(191, 191, 191) - cinza 
 
 Private Const RES_ENVIADO As String = "Enviado"
 Private Const RES_DESFEITO As String = "Desfeito"
+Private Const RES_MANTIDO As String = "Não desfeito (célula já alterada)"
+Private Const MAX_ENVIOS_LOG As Long = 30   ' quantos envios o LOG ENVIO guarda
 
 Private mPaineis As Object      ' nome da aba -> informações do painel
 Private mLog As Collection
+Private mIdEnvio As String        ' identificação (data/hora) do envio em andamento
 Private mSenhaDigitada As String  ' senha informada pelo usuário nesta execução
 
 ' Família (cabeçalho em ROTAS E FAMILIAS) -> painel -> coluna de data usada.
@@ -123,6 +126,7 @@ Public Sub EnviarLotesParaPaineis()
 
     Set mPaineis = CreateObject("Scripting.Dictionary")
     Set mLog = New Collection
+    mIdEnvio = Format(Now, "dd/mm/yyyy hh:mm:ss")
     mSenhaDigitada = ""
     For j = LBound(mapa) To UBound(mapa)
         If Not mPaineis.Exists(CStr(mapa(j)(1))) Then
@@ -232,35 +236,57 @@ End Function
 
 '==========================================================================
 ' 2) DESFAZER O ÚLTIMO ENVIO
+'    Cada clique desfaz um envio, do mais recente para o mais antigo.
+'    Só apaga a célula se ela ainda estiver no lugar e com o mesmo texto:
+'    o que a analista já moveu ou editou é mantido.
 '==========================================================================
 Public Sub DesfazerUltimoEnvio()
     Dim wsLog As Worksheet, ultLin As Long, r As Long, n As Long, ignorados As Long
-    Dim ws As Worksheet, cel As Range
+    Dim ws As Worksheet, cel As Range, alvo As String, achou As Boolean, total As Long
 
     On Error Resume Next
     Set wsLog = ThisWorkbook.Worksheets(ABA_LOG)
     On Error GoTo 0
-    If wsLog Is Nothing Then
-        MsgBox "Não há envio registrado para desfazer.", vbInformation
+    If Not wsLog Is Nothing Then ultLin = wsLog.Cells(wsLog.Rows.Count, 2).End(xlUp).Row
+
+    ' O log fica com o envio mais recente no topo: o primeiro "Enviado" é o alvo.
+    For r = 2 To ultLin
+        If wsLog.Cells(r, 2).Value = RES_ENVIADO Then
+            alvo = CStr(wsLog.Cells(r, 9).Value)
+            achou = True
+            Exit For
+        End If
+    Next r
+    If Not achou Then
+        MsgBox "Não há envio para desfazer.", vbInformation
         Exit Sub
     End If
 
-    ultLin = wsLog.Cells(wsLog.Rows.Count, 1).End(xlUp).Row
-    If ultLin < 2 Then
-        MsgBox "Não há envio registrado para desfazer.", vbInformation
-        Exit Sub
-    End If
-    If MsgBox("Apagar dos painéis os lotes escritos no último envio?" & vbLf & _
-              "(Células que a analista já alterou não são mexidas.)", vbQuestion + vbYesNo) = vbNo Then Exit Sub
+    For r = 2 To ultLin
+        If wsLog.Cells(r, 2).Value = RES_ENVIADO And CStr(wsLog.Cells(r, 9).Value) = alvo Then total = total + 1
+    Next r
+    If MsgBox("Desfazer o envio " & IIf(alvo = "", "anterior", "de " & alvo) & "?" & vbLf & vbLf & _
+              total & " lote(s) serão apagados dos painéis." & vbLf & _
+              "Lotes que a analista já moveu ou editou não são mexidos.", vbQuestion + vbYesNo, "Desfazer envio") = vbNo Then Exit Sub
 
     Set mPaineis = CreateObject("Scripting.Dictionary")
     mSenhaDigitada = ""
     Application.ScreenUpdating = False
     For r = 2 To ultLin
-        If wsLog.Cells(r, 2).Value = RES_ENVIADO Then
+        If wsLog.Cells(r, 2).Value = RES_ENVIADO And CStr(wsLog.Cells(r, 9).Value) = alvo Then
+            Set ws = Nothing
+            Set cel = Nothing
+            On Error Resume Next
             Set ws = ThisWorkbook.Worksheets(CStr(wsLog.Cells(r, 3).Value))
-            Set cel = ws.Range(CStr(wsLog.Cells(r, 6).Value))
-            If TextoCelula(cel.Value) = TextoCelula(wsLog.Cells(r, 7).Value) Then
+            If Not ws Is Nothing Then Set cel = ws.Range(CStr(wsLog.Cells(r, 6).Value))
+            On Error GoTo 0
+            If cel Is Nothing Then
+                wsLog.Cells(r, 2).Value = RES_MANTIDO
+                ignorados = ignorados + 1
+            ElseIf TextoCelula(cel.Value) <> TextoCelula(wsLog.Cells(r, 7).Value) Then
+                wsLog.Cells(r, 2).Value = RES_MANTIDO
+                ignorados = ignorados + 1
+            Else
                 If Not mPaineis.Exists(ws.Name) Then mPaineis.Add ws.Name, InfoProtecao(ws)
                 If DesprotegerPainel(mPaineis(ws.Name)) Then
                     cel.ClearContents
@@ -270,8 +296,6 @@ Public Sub DesfazerUltimoEnvio()
                 Else
                     ignorados = ignorados + 1
                 End If
-            Else
-                ignorados = ignorados + 1
             End If
         End If
     Next r
@@ -279,7 +303,8 @@ Public Sub DesfazerUltimoEnvio()
     Application.ScreenUpdating = True
 
     MsgBox n & " lote(s) removido(s) dos painéis." & _
-           IIf(ignorados > 0, vbLf & ignorados & " célula(s) mantida(s) (já alteradas ou painel sem senha).", ""), vbInformation
+           IIf(ignorados > 0, vbLf & ignorados & " lote(s) mantido(s): a analista já tinha movido/editado a célula.", "") & _
+           vbLf & vbLf & "Clique de novo em Desfazer para voltar mais um envio.", vbInformation, "Desfazer envio"
 End Sub
 
 
@@ -575,12 +600,17 @@ End Sub
 Private Sub RegistrarLog(ByVal resultado As String, ByVal painel As String, ByVal familia As String, _
                          ByVal dataProg As String, ByVal celula As String, ByVal conc As String, _
                          Optional ByVal corAnterior As Variant = "")
-    mLog.Add Array(Now, resultado, painel, familia, dataProg, celula, conc, corAnterior)
+    mLog.Add Array(Now, resultado, painel, familia, dataProg, celula, conc, corAnterior, mIdEnvio)
 End Sub
 
+' Acrescenta o envio atual no topo do LOG ENVIO (mais recente primeiro) e
+' mantém só os últimos MAX_ENVIOS_LOG envios. Um clique que não gerou nenhuma
+' linha não apaga o histórico, então o Desfazer continua funcionando.
 Private Sub GravarLog()
     Dim ws As Worksheet, i As Long, saida() As Variant, k As Long, linha As Variant
+
     If mLog Is Nothing Then Exit Sub
+    If mLog.Count = 0 Then Exit Sub
 
     On Error Resume Next
     Set ws = ThisWorkbook.Worksheets(ABA_LOG)
@@ -590,20 +620,40 @@ Private Sub GravarLog()
         ws.Name = ABA_LOG
     End If
 
-    ws.Cells.ClearContents
-    ws.Range("A1:H1").Value = Array("Data/hora", "Resultado", "Painel", "Família", "Data programada", "Célula", "Concatenado", "Cor anterior")
-    ws.Range("A1:H1").Font.Bold = True
-    If mLog.Count > 0 Then
-        ReDim saida(1 To mLog.Count, 1 To 8)
-        For i = 1 To mLog.Count
-            linha = mLog(i)
-            For k = 0 To 7
-                saida(i, k + 1) = linha(k)
-            Next k
-        Next i
-        ws.Range("A:A").NumberFormat = "dd/mm/yyyy hh:mm"
-        ws.Range("E:F").NumberFormat = "@"
-        ws.Range("A2").Resize(mLog.Count, 8).Value = saida
-    End If
+    ws.Range("A1:I1").Value = Array("Data/hora", "Resultado", "Painel", "Família", "Data programada", "Célula", "Concatenado", "Cor anterior", "Envio")
+    ws.Range("A1:I1").Font.Bold = True
+
+    ReDim saida(1 To mLog.Count, 1 To 9)
+    For i = 1 To mLog.Count
+        linha = mLog(i)
+        For k = 0 To 8
+            saida(i, k + 1) = linha(k)
+        Next k
+    Next i
+    ws.Rows("2:" & mLog.Count + 1).Insert Shift:=xlDown
+    ws.Rows("2:" & mLog.Count + 1).Font.Bold = False
+    ws.Range("A:A").NumberFormat = "dd/mm/yyyy hh:mm"
+    ws.Range("E:F").NumberFormat = "@"
+    ws.Range("I:I").NumberFormat = "@"
+    ws.Range("A2").Resize(mLog.Count, 9).Value = saida
+
+    LimparLogAntigo ws
     ws.Columns("A:F").AutoFit
+    ws.Columns("I").AutoFit
+End Sub
+
+Private Sub LimparLogAntigo(ws As Worksheet)
+    Dim ultLin As Long, r As Long, ids As Object, id As String
+    ultLin = ws.Cells(ws.Rows.Count, 2).End(xlUp).Row
+    Set ids = CreateObject("Scripting.Dictionary")
+    For r = 2 To ultLin
+        id = CStr(ws.Cells(r, 9).Value)
+        If Not ids.Exists(id) Then
+            If ids.Count >= MAX_ENVIOS_LOG Then
+                ws.Rows(r & ":" & ultLin).Delete
+                Exit Sub
+            End If
+            ids.Add id, True
+        End If
+    Next r
 End Sub
