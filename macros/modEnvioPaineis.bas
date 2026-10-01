@@ -50,7 +50,7 @@ Private Const RES_ENVIADO As String = "Enviado"
 Private Const RES_DESFEITO As String = "Desfeito"
 Private Const RES_PASSADO As String = "Data já passou: não enviado"
 Private Const RES_MANTIDO As String = "Não desfeito (célula já alterada)"
-Private Const MAX_ENVIOS_LOG As Long = 30   ' quantos envios o LOG ENVIO guarda
+Private Const MAX_ENVIOS_LOG As Long = 10   ' quantos envios o LOG ENVIO guarda (menos = arquivo mais leve)
 
 Private mPaineis As Object      ' nome da aba -> informações do painel
 Private mLog As Collection
@@ -164,8 +164,7 @@ Public Sub EnviarLotesParaPaineis()
            "Já estavam no painel: " & nJaNoPainel & vbLf & _
            "Data já passou (não enviados): " & nPassados & vbLf & _
            "Não enviados (sem vaga / sem data / sem coluna): " & nProblemas & _
-           IIf(nEnviados + nPassados + nProblemas > 0, vbLf & vbLf & "Lote a lote na aba """ & ABA_LOG & """" & _
-               " (verde = enviado, amarelo = data passada, vermelho = não enviado).", ""), _
+           IIf(nEnviados + nPassados + nProblemas > 0, vbLf & vbLf & "Lote a lote na aba """ & ABA_LOG & """.", ""), _
            IIf(nPassados + nProblemas > 0, vbExclamation, vbInformation)
     Exit Sub
 
@@ -297,7 +296,6 @@ Public Sub DesfazerUltimoEnvio()
                     cel.ClearContents
                     If TextoCelula(wsLog.Cells(r, 8).Value) <> "" Then RestaurarCor cel, CLng(wsLog.Cells(r, 8).Value)
                     wsLog.Cells(r, 2).Value = RES_DESFEITO
-                    wsLog.Cells(r, 2).Interior.Pattern = xlNone
                     n = n + 1
                 Else
                     ignorados = ignorados + 1
@@ -637,31 +635,17 @@ Private Sub GravarLog()
         Next k
     Next i
     If ws.AutoFilterMode Then ws.AutoFilterMode = False
-    ws.Rows("2:" & mLog.Count + 1).Insert Shift:=xlDown
-    ws.Rows("2:" & mLog.Count + 1).Font.Bold = False
-    ws.Rows("2:" & mLog.Count + 1).Interior.Pattern = xlNone
+    ws.Rows("2:" & mLog.Count + 1).Insert Shift:=xlDown, CopyOrigin:=xlFormatFromRightOrBelow
     ws.Range("A:A").NumberFormat = "dd/mm/yyyy hh:mm"
     ws.Range("E:F").NumberFormat = "@"
     ws.Range("I:I").NumberFormat = "@"
     ws.Range("A2").Resize(mLog.Count, 9).Value = saida
-    For i = 1 To mLog.Count
-        ws.Cells(i + 1, 2).Interior.Color = CorDoResultado(CStr(saida(i, 2)))
-    Next i
 
     LimparLogAntigo ws
     ws.Range("A1:I" & ws.Cells(ws.Rows.Count, 2).End(xlUp).Row).AutoFilter
     ws.Columns("A:F").AutoFit
     ws.Columns("I").AutoFit
 End Sub
-
-' Verde = enviado, amarelo = data passada, vermelho = não enviado por problema.
-Private Function CorDoResultado(ByVal resultado As String) As Long
-    Select Case resultado
-        Case RES_ENVIADO: CorDoResultado = RGB(198, 239, 206)
-        Case RES_PASSADO: CorDoResultado = RGB(255, 235, 156)
-        Case Else: CorDoResultado = RGB(255, 199, 206)
-    End Select
-End Function
 
 Private Sub LimparLogAntigo(ws As Worksheet)
     Dim ultLin As Long, r As Long, ids As Object, id As String

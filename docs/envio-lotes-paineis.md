@@ -47,14 +47,13 @@ Regras:
 - **Bloco cheio:** se as 9 vagas da data estão ocupadas, o lote não entra e aparece
   no log como "Sem vaga", para a analista decidir onde colocar.
 - Ao final, mostra um resumo e grava, lote a lote, na aba **LOG ENVIO** o que foi
-  enviado (com a célula) e o que não entrou e por quê. A coluna Resultado é
-  colorida: **verde** = enviado, **amarelo** = data passada, **vermelho** = sem
-  vaga / sem data / data ou família não encontrada no painel. O cabeçalho tem
-  filtro.
+  enviado (com a célula) e o que não entrou e por quê (data passada, sem vaga,
+  sem data, data ou família não encontrada no painel). Sem cores, para não pesar
+  o arquivo; o cabeçalho tem filtro.
 - `DesfazerUltimoEnvio` desfaz **um envio por clique**, do mais recente para o
   mais antigo. Apaga as células que aquele envio escreveu e devolve a cor
   anterior. Lotes que a analista já moveu ou editou são mantidos e marcados no
-  log como "Não desfeito". O log **acumula** os últimos 30 envios (o mais
+  log como "Não desfeito". O log **acumula** os últimos 10 envios (`MAX_ENVIOS_LOG`) (o mais
   recente no topo, coluna **Envio** = data/hora do clique). Um clique em
   "Enviar lotes" que não envia nada não apaga o histórico.
 - O `PAINEL - BANCADA` está protegido **com senha**. Na primeira vez que precisar
