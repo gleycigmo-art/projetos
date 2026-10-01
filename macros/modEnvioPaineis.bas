@@ -8,6 +8,9 @@ Option Explicit
 ' DesfazerUltimoEnvio        -> apaga o que o último envio escreveu
 ' ConverterFormulasEmValores -> (uma vez) congela as fórmulas antigas
 '
+' Os lotes enviados ficam pintados de cinza claro ("Prog. em andamento"),
+' para a analista ver o que veio automático e trocar a cor ao ajustar.
+'
 ' A macro só ESCREVE em células vazias e nunca move nem apaga o que a
 ' analista já posicionou. Um lote que já está no bloco da família (em
 ' qualquer data) não é enviado de novo, então a analista pode arrastar
@@ -34,6 +37,12 @@ Private Const DIAS_RETROATIVOS As Long = 0
 Private Const ATUALIZAR_ROTAS_ANTES As Boolean = False
 
 Private Const ABA_LOG As String = "LOG ENVIO"
+
+' Células preenchidas pela macro recebem a cor da legenda abaixo (linhas 1 a 3
+' do painel). Se a legenda não for encontrada, usa o cinza claro padrão.
+Private Const PINTAR_ENVIADOS As Boolean = True
+Private Const TEXTO_LEGENDA_AUTO As String = "Prog. em andamento"
+Private Const COR_AUTO_PADRAO As Long = 12566463   ' RGB(191, 191, 191) - cinza claro
 
 '-----------------------------------------------
 
@@ -169,7 +178,7 @@ End Sub
 ' Retorna 1 = enviado, 2 = já estava no painel, 3 = data passada, 0 = não enviado.
 Private Function EnviarLote(ByVal conc As String, ByVal familia As String, painel As Object, ByVal valorData As Variant) As Long
     Dim ws As Worksheet, d As Long, chave As String, famU As String
-    Dim col As Long, linhas As Collection, r As Variant
+    Dim col As Long, linhas As Collection, r As Variant, corAnterior As Long
 
     Set ws = painel("ws")
     famU = Normalizar(familia)
@@ -207,9 +216,11 @@ Private Function EnviarLote(ByVal conc As String, ByVal familia As String, paine
                 RegistrarLog "Painel protegido: senha não informada ou incorreta", ws.Name, familia, Format(CDate(d), "dd/mm/yyyy"), "", conc
                 Exit Function
             End If
+            corAnterior = CorDaCelula(ws.Cells(CLng(r), col))
             ws.Cells(CLng(r), col).Value = conc
+            If PINTAR_ENVIADOS Then ws.Cells(CLng(r), col).Interior.Color = painel("cor")
             painel("chaves").Item(chave) = True
-            RegistrarLog RES_ENVIADO, ws.Name, familia, Format(CDate(d), "dd/mm/yyyy"), ws.Cells(CLng(r), col).Address(False, False), conc
+            RegistrarLog RES_ENVIADO, ws.Name, familia, Format(CDate(d), "dd/mm/yyyy"), ws.Cells(CLng(r), col).Address(False, False), conc, corAnterior
             EnviarLote = 1
             Exit Function
         End If
@@ -253,6 +264,7 @@ Public Sub DesfazerUltimoEnvio()
                 If Not mPaineis.Exists(ws.Name) Then mPaineis.Add ws.Name, InfoProtecao(ws)
                 If DesprotegerPainel(mPaineis(ws.Name)) Then
                     cel.ClearContents
+                    If TextoCelula(wsLog.Cells(r, 8).Value) <> "" Then RestaurarCor cel, CLng(wsLog.Cells(r, 8).Value)
                     wsLog.Cells(r, 2).Value = RES_DESFEITO
                     n = n + 1
                 Else
@@ -395,6 +407,7 @@ Private Function PrepararPainel(ws As Worksheet) As Object
     info.Add "primeiraCol", primeiraCol
     info.Add "ultCol", ultCol
     info.Add "ultLin", ultLin
+    info.Add "cor", CorDaLegenda(ws)
     Set PrepararPainel = info
 End Function
 
@@ -530,9 +543,39 @@ Private Function CelulaVazia(cel As Range) As Boolean
     CelulaVazia = (TextoCelula(cel.Value) = "")
 End Function
 
+' Cor da célula da legenda (linhas 1 a 3) cujo texto é TEXTO_LEGENDA_AUTO.
+Private Function CorDaLegenda(ws As Worksheet) As Long
+    Dim cel As Range
+    CorDaLegenda = COR_AUTO_PADRAO
+    For Each cel In ws.Range("A1:Z3").Cells
+        If Normalizar(cel.Value) = Normalizar(TEXTO_LEGENDA_AUTO) Then
+            If cel.Interior.Pattern <> xlNone Then CorDaLegenda = cel.Interior.Color
+            Exit Function
+        End If
+    Next cel
+End Function
+
+' -1 = célula sem preenchimento.
+Private Function CorDaCelula(cel As Range) As Long
+    If cel.Interior.Pattern = xlNone Then
+        CorDaCelula = -1
+    Else
+        CorDaCelula = cel.Interior.Color
+    End If
+End Function
+
+Private Sub RestaurarCor(cel As Range, ByVal cor As Long)
+    If cor = -1 Then
+        cel.Interior.Pattern = xlNone
+    Else
+        cel.Interior.Color = cor
+    End If
+End Sub
+
 Private Sub RegistrarLog(ByVal resultado As String, ByVal painel As String, ByVal familia As String, _
-                         ByVal dataProg As String, ByVal celula As String, ByVal conc As String)
-    mLog.Add Array(Now, resultado, painel, familia, dataProg, celula, conc)
+                         ByVal dataProg As String, ByVal celula As String, ByVal conc As String, _
+                         Optional ByVal corAnterior As Variant = "")
+    mLog.Add Array(Now, resultado, painel, familia, dataProg, celula, conc, corAnterior)
 End Sub
 
 Private Sub GravarLog()
@@ -548,19 +591,19 @@ Private Sub GravarLog()
     End If
 
     ws.Cells.ClearContents
-    ws.Range("A1:G1").Value = Array("Data/hora", "Resultado", "Painel", "Família", "Data programada", "Célula", "Concatenado")
-    ws.Range("A1:G1").Font.Bold = True
+    ws.Range("A1:H1").Value = Array("Data/hora", "Resultado", "Painel", "Família", "Data programada", "Célula", "Concatenado", "Cor anterior")
+    ws.Range("A1:H1").Font.Bold = True
     If mLog.Count > 0 Then
-        ReDim saida(1 To mLog.Count, 1 To 7)
+        ReDim saida(1 To mLog.Count, 1 To 8)
         For i = 1 To mLog.Count
             linha = mLog(i)
-            For k = 0 To 6
+            For k = 0 To 7
                 saida(i, k + 1) = linha(k)
             Next k
         Next i
         ws.Range("A:A").NumberFormat = "dd/mm/yyyy hh:mm"
         ws.Range("E:F").NumberFormat = "@"
-        ws.Range("A2").Resize(mLog.Count, 7).Value = saida
+        ws.Range("A2").Resize(mLog.Count, 8).Value = saida
     End If
     ws.Columns("A:F").AutoFit
 End Sub

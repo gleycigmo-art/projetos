@@ -38,13 +38,16 @@ Regras:
   (código + descrição + lotes), então a analista pode arrastar o lote para outro
   dia e o próximo envio não traz uma cópia de volta. Isso vale mesmo se a data
   mudar em ROTAS E FAMILIAS.
+- **Pinta de cinza claro** (cor da legenda "Prog. em andamento", célula D2 do
+  painel) cada célula preenchida pela macro. Assim a analista vê o que veio
+  automático e troca a cor conforme ajusta. Desligue com `PINTAR_ENVIADOS = False`.
 - **Ignora datas passadas** (configurável em `DIAS_RETROATIVOS`).
 - **Bloco cheio:** se as 9 vagas da data estão ocupadas, o lote não entra e aparece
   no log como "Sem vaga", para a analista decidir onde colocar.
 - Ao final, mostra um resumo e grava o detalhe na aba **LOG ENVIO**: o que foi
   enviado (com a célula) e o que não entrou (e por quê).
 - `DesfazerUltimoEnvio` apaga o que o último envio escreveu, exceto as células
-  que a analista já alterou depois.
+  que a analista já alterou depois, e devolve a cor que a célula tinha antes.
 - O `PAINEL - BANCADA` está protegido **com senha**. Na primeira vez que precisar
   escrever nele, a macro **pede a senha** (uma vez por clique), escreve e protege
   de novo com a mesma senha e as mesmas permissões (formatar, classificar,
@@ -82,7 +85,8 @@ Regras:
 |---|---|---|
 | `DIAS_RETROATIVOS` | `0` | `0` = envia de hoje em diante; `2` = aceita até 2 dias atrás |
 | `ATUALIZAR_ROTAS_ANTES` | `False` | atualiza a consulta antes de enviar |
-| `SENHA_PAINEIS` | `""` | senha dos painéis; vazio = a macro pergunta na hora |
+| `SENHA_PAINEIS` | `""` | senha dos painéis; vazio = a macro pergunta na hora. **Não versionar a senha no repositório**: preencha só na cópia importada no Excel |
+| `PINTAR_ENVIADOS` | `True` | pinta as células enviadas com a cor da legenda `TEXTO_LEGENDA_AUTO` |
 | `MapaFamilias()` | 9 famílias | família → painel → coluna de data. Família nova = uma linha nova aqui (o nome tem de ser igual ao da coluna B do painel) |
 
 ## Simulação com o arquivo atual (01/10/2026)
