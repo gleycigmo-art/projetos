@@ -33,6 +33,14 @@ Private Const ATUALIZAR_ROTAS_ANTES As Boolean = False
 
 Private Const ABA_LOG As String = "LOG ENVIO"
 
+'-----------------------------------------------
+
+Private Const RES_ENVIADO As String = "Enviado"
+Private Const RES_DESFEITO As String = "Desfeito"
+
+Private mPaineis As Object      ' nome da aba -> informações do painel
+Private mLog As Collection
+
 ' Família (cabeçalho em ROTAS E FAMILIAS) -> painel -> coluna de data usada.
 ' O nome da família deve ser igual ao da coluna B do painel.
 Private Function MapaFamilias() As Variant
@@ -47,13 +55,6 @@ Private Function MapaFamilias() As Variant
         Array("Teste CG", "PAINEL - CG", COL_DATA_CROMATO), _
         Array("Teste HPLC", "PAINEL - HPLC", COL_DATA_CROMATO))
 End Function
-'-----------------------------------------------
-
-Private Const RES_ENVIADO As String = "Enviado"
-Private Const RES_DESFEITO As String = "Desfeito"
-
-Private mPaineis As Object      ' nome da aba -> informações do painel
-Private mLog As Collection
 
 
 '==========================================================================
@@ -186,11 +187,11 @@ Private Function EnviarLote(ByVal conc As String, ByVal familia As String, paine
     End If
 
     If Not painel("blocos").Exists(famU) Then
-        RegistrarLog "Família não existe na coluna B do painel", ws.Name, familia, Format(d, "dd/mm/yyyy"), "", conc
+        RegistrarLog "Família não existe na coluna B do painel", ws.Name, familia, Format(CDate(d), "dd/mm/yyyy"), "", conc
         Exit Function
     End If
     If Not painel("datas").Exists(d) Then
-        RegistrarLog "Data não existe na linha " & LINHA_CABECALHO & " do painel", ws.Name, familia, Format(d, "dd/mm/yyyy"), "", conc
+        RegistrarLog "Data não existe na linha " & LINHA_CABECALHO & " do painel", ws.Name, familia, Format(CDate(d), "dd/mm/yyyy"), "", conc
         Exit Function
     End If
 
@@ -201,13 +202,13 @@ Private Function EnviarLote(ByVal conc As String, ByVal familia As String, paine
             DesprotegerPainel painel
             ws.Cells(CLng(r), col).Value = conc
             painel("chaves").Item(chave) = True
-            RegistrarLog RES_ENVIADO, ws.Name, familia, Format(d, "dd/mm/yyyy"), ws.Cells(CLng(r), col).Address(False, False), conc
+            RegistrarLog RES_ENVIADO, ws.Name, familia, Format(CDate(d), "dd/mm/yyyy"), ws.Cells(CLng(r), col).Address(False, False), conc
             EnviarLote = 1
             Exit Function
         End If
     Next r
 
-    RegistrarLog "Sem vaga: bloco cheio nesta data", ws.Name, familia, Format(d, "dd/mm/yyyy"), "", conc
+    RegistrarLog "Sem vaga: bloco cheio nesta data", ws.Name, familia, Format(CDate(d), "dd/mm/yyyy"), "", conc
 End Function
 
 
