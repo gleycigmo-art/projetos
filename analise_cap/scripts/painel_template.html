@@ -1,0 +1,622 @@
+<title>Mapa de Capacidade CQPA</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: barra de filtros fixa no topo de um "relatório de laboratório"; resumo (indicadores) antes do detalhe (gráficos, depois a tabela CAP). */
+:root {
+  --bg: #f6f7f8;
+  --panel: #ffffff;
+  --ink: #15202b;
+  --ink-2: #4a5866;
+  --ink-3: #75828f;
+  --line: #dde2e7;
+  --line-2: #eceff2;
+  --accent: #1d4f73;
+  --accent-soft: #e3edf5;
+  --sub: #2a78d6;
+  --ok: #0c8a0c;
+  --bad: #c43535;
+  --warn: #b77a00;
+  --cx1: #86b6ef; --cx2: #3987e5; --cx3: #1c5cab; --cx4: #0d366b;
+  --cx0: #c9ced3;
+  --code-bg: #f0f3f5;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171c; --panel: #1a2128; --ink: #e8edf1; --ink-2: #b3bec8; --ink-3: #8794a0;
+    --line: #2d3843; --line-2: #232c35; --accent: #8cc0e6; --accent-soft: #1e3344;
+    --sub: #5c9ded; --ok: #39b939; --bad: #e66767; --warn: #e0a526;
+    --cx1: #9ec5f4; --cx2: #5598e7; --cx3: #2a78d6; --cx4: #184f95; --cx0: #4a5560;
+    --code-bg: #222b33; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12171c; --panel: #1a2128; --ink: #e8edf1; --ink-2: #b3bec8; --ink-3: #8794a0;
+  --line: #2d3843; --line-2: #232c35; --accent: #8cc0e6; --accent-soft: #1e3344;
+  --sub: #5c9ded; --ok: #39b939; --bad: #e66767; --warn: #e0a526;
+  --cx1: #9ec5f4; --cx2: #5598e7; --cx3: #2a78d6; --cx4: #184f95; --cx0: #4a5560;
+  --code-bg: #222b33; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: 0.005em; }
+h1 { font-size: 26px; font-weight: 700; }
+h2 { font-size: 20px; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+p { margin: 0; }
+.num, td.n, .kpi .v { font-variant-numeric: tabular-nums; }
+code, .mono { font-family: var(--font-mono); font-size: 12.5px; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+
+header.top { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: flex-end; justify-content: space-between; padding-bottom: 14px; border-bottom: 2px solid var(--accent); }
+header.top .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 600; }
+header.top .meta { color: var(--ink-2); font-size: 12.5px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 500; border: 1px solid var(--line); background: var(--panel); color: var(--ink-2); white-space: nowrap; }
+.chip.ok { border-color: color-mix(in srgb, var(--ok) 45%, transparent); color: var(--ok); }
+.chip.bad { border-color: color-mix(in srgb, var(--bad) 45%, transparent); color: var(--bad); }
+.chip.warn { border-color: color-mix(in srgb, var(--warn) 45%, transparent); color: var(--warn); }
+.chip.info { border-color: color-mix(in srgb, var(--sub) 45%, transparent); color: var(--sub); }
+
+nav.tabs { display: flex; gap: 2px; margin-top: 14px; overflow-x: auto; border-bottom: 1px solid var(--line); }
+nav.tabs a { padding: 9px 14px; color: var(--ink-2); text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+nav.tabs a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+nav.tabs a:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+section.view { padding-top: 18px; display: grid; gap: 18px; }
+
+.filters { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; border-bottom: 1px solid var(--line-2); }
+.f { display: grid; gap: 3px; }
+.f label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); font-weight: 600; }
+select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-height: 32px; max-width: 100%; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--panel); }
+.seg button { font: inherit; font-weight: 500; border: 0; background: transparent; color: var(--ink-2); padding: 5px 12px; min-height: 32px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+.periodo-label { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+.basis { color: var(--ink-3); font-size: 12.5px; }
+
+.grid-kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.kgroup h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); margin-bottom: 8px; }
+.kpi { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline; padding-block: 6px; border-top: 1px solid var(--line-2); }
+.kpi:first-of-type { border-top: 0; }
+.kpi .l { color: var(--ink-2); }
+.kpi .v { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
+.kpi .f { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-3); font-family: var(--font-mono); display: block; }
+.kpi.hero .v { font-size: 30px; }
+.gauge { margin-top: 6px; }
+.gauge svg { width: 100%; height: auto; display: block; }
+
+.row2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 900px) { .row2 { grid-template-columns: minmax(0, 1fr); } }
+.card h2 { font-size: 16px; margin-bottom: 4px; }
+.card .sub { color: var(--ink-3); font-size: 12.5px; margin-bottom: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--ink-2); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--ink-2); font-family: var(--font-body); font-size: 11px; }
+.chart .gridline { stroke: var(--line-2); }
+.chart .ref { stroke: var(--ink-3); stroke-dasharray: 3 3; }
+.tip { position: fixed; pointer-events: none; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.12); max-width: 280px; }
+.tip b { display: block; margin-bottom: 3px; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
+.tip .r span:last-child { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { padding: 6px 9px; border-bottom: 1px solid var(--line-2); text-align: left; white-space: nowrap; }
+th { font-weight: 600; color: var(--ink-2); background: var(--panel); position: sticky; top: 0; font-size: 11.5px; }
+th button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+td.n, th.n { text-align: right; }
+tbody tr:hover { background: var(--accent-soft); }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+.pill.sub .dot { background: var(--sub); } .pill.ok .dot { background: var(--ok); } .pill.bad .dot { background: var(--bad); }
+.pill.bad { color: var(--bad); }
+
+.prose { max-width: 78ch; display: grid; gap: 10px; }
+.prose ul, .prose ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.doc { display: grid; gap: 18px; }
+.doc .card { display: grid; gap: 10px; }
+.formula { font-family: var(--font-mono); font-size: 12.5px; background: var(--code-bg); border-radius: 8px; padding: 10px 12px; overflow-x: auto; white-space: pre; line-height: 1.6; }
+.steps { counter-reset: s; display: grid; gap: 10px; }
+.find { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; padding-block: 10px; border-top: 1px solid var(--line-2); }
+.find:first-of-type { border-top: 0; }
+.find .what { font-weight: 600; }
+.find .det { grid-column: 2; color: var(--ink-2); }
+.phase { display: grid; gap: 8px; }
+.phase .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-weight: 700; }
+pre.mermaid { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow-x: auto; }
+.note { font-size: 12.5px; color: var(--ink-2); border-left: 3px solid var(--line); padding-left: 10px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div style="display:grid;gap:4px;min-width:0">
+      <span class="eyebrow">Controle de Qualidade Produto Acabado · MFV 2026</span>
+      <h1>Mapa de Capacidade CQPA</h1>
+      <span class="meta">Retrato do arquivo <span class="mono">MFV_CQPA_2026_Oficial. 30-10-26.xlsb</span> · Protótipo do painel proposto</span>
+    </div>
+    <span class="chip ok" title="Ver aba Validação">✓ Semana 45 idêntica ao arquivo (0 diferenças)</span>
+  </header>
+
+  <nav class="tabs" aria-label="Seções">
+    <a href="#painel" data-tab="painel">Painel</a>
+    <a href="#racional" data-tab="racional">Como é calculado</a>
+    <a href="#achados" data-tab="achados">Achados</a>
+    <a href="#proposta" data-tab="proposta">Sugestões</a>
+    <a href="#validacao" data-tab="validacao">Validação</a>
+  </nav>
+
+  <!-- ═════════════════════════════ PAINEL ═════════════════════════════ -->
+  <section class="view" id="v-painel">
+    <div class="filters" role="group" aria-label="Filtros">
+      <div class="f"><label>Visão</label>
+        <div class="seg" id="segVisao">
+          <button type="button" id="btnSem" data-v="Semanal" aria-pressed="true">Semanal</button>
+          <button type="button" id="btnMes" data-v="Mensal" aria-pressed="false">Mensal</button>
+        </div>
+      </div>
+      <div class="f" id="fSemana"><label for="selSemana">Semana</label><select id="selSemana"></select></div>
+      <div class="f" id="fMesIni" hidden><label for="selMesIni">Mês início</label><select id="selMesIni"></select></div>
+      <div class="f" id="fMesFim" hidden><label for="selMesFim">Mês fim</label><select id="selMesFim"></select></div>
+      <div class="f"><label for="selCat">Categoria</label>
+        <select id="selCat"><option value="Mão de Obra">Mão de Obra</option><option value="Equipamento">Equipamento</option><option value="">Todas</option></select></div>
+      <div class="f"><label for="selStatus">Carregamento</label>
+        <select id="selStatus"><option value="">Todos</option><option value="bad">Sobrecarregado (&gt; 1,00)</option><option value="ok">Adequado (0,80 a 1,00)</option><option value="sub">Sub-utilizado (&lt; 0,80)</option></select></div>
+    </div>
+
+    <div style="display:grid;gap:4px">
+      <div class="periodo-label" id="perLabel">—</div>
+      <div class="basis" id="perBasis">—</div>
+    </div>
+
+    <div class="grid-kpi" id="kpis"></div>
+
+    <div class="row2">
+      <div class="card chart">
+        <h2>Carregamento por família</h2>
+        <p class="sub" id="carSub">CM (h) ÷ Total recurso (h) ÷ OEE real. Linhas tracejadas em 0,80 e 1,00.</p>
+        <div class="legend">
+          <span><i style="background:var(--sub)"></i>Sub-utilizado &lt; 0,80</span>
+          <span><i style="background:var(--ok)"></i>Adequado 0,80–1,00</span>
+          <span><i style="background:var(--bad)"></i>Sobrecarregado &gt; 1,00</span>
+        </div>
+        <div id="chartCarr"></div>
+      </div>
+      <div class="card chart">
+        <h2>Complexidade dos lotes</h2>
+        <p class="sub" id="cxSub">—</p>
+        <div id="chartCx"></div>
+        <div class="tablewrap" style="margin-top:10px"><table id="tblCx"><thead><tr><th>Nível</th><th>Tempo total do método</th><th class="n">Lotes</th><th class="n">% (1 a 4)</th></tr></thead><tbody></tbody></table></div>
+        <p class="note" style="margin-top:10px" id="cxNote"></p>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:8px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between">
+        <h2>CAP proposta</h2>
+        <span class="basis" id="tblCount">—</span>
+      </div>
+      <div class="tablewrap" style="max-height:620px"><table id="tblCap"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ═════════════════════════════ RACIONAL ═════════════════════════════ -->
+  <section class="view doc" id="v-racional" hidden>
+    <div class="prose">
+      <h2>Do lote à CAP: o caminho dos números</h2>
+      <p>A CAP proposta é a saída da consulta Power Query <code>CAP_PROPOSTA</code>. Ela soma, por família, o tempo de mão de obra e de equipamento que a demanda do período exige (CM), e compara com o tempo disponível (Total recurso × OEE). Tudo parte de três perguntas: <b>quantos lotes</b> (demanda), <b>quanto tempo cada lote consome</b> (BASE TC, com regras de campanha e skip) e <b>quanto tempo existe</b> (FAMÍLIAS + calendário).</p>
+    </div>
+    <pre class="mermaid">
+flowchart LR
+  F["FILTRO_DATA<br/>Tabela_FILTRO"] --> FP["FILTRO_PERIODO"]
+  SP["SharePoint<br/>Base Quarentena tratada.xlsx"] --> DS["Tabela_DemandaSemanal"]
+  DM["DEMANDA<br/>Tabela_DEMANDA"] --> DMPR["DEMANDA_MPR"]
+  DS --> DMPR
+  FP --> DMPR
+  TC["BASE TC<br/>Tabela_BASE_TC"] --> BTC["BASE_TC_CAMP"]
+  CA["CAMPANHA"] --> BTC
+  SK["SKIP_IMPUREZA"] --> BTC
+  CA --> FT["FONTES_TC"]
+  SK --> FT
+  EC["ETAPAS_CAMPANHAS<br/>% tempo repetido"] --> FT
+  TC --> FT
+  BTC --> TCC["TC_COM_CAMPANHA<br/>8 blocos de processo"]
+  FT --> TCC
+  DMPR --> TCC
+  FAM["FAMÍLIAS<br/>Tabela_FAM + calendários"] --> FAMP["FAM_PROPOSTA"]
+  FP -.-> FAM
+  TCC --> CAP["CAP_PROPOSTA"]
+  FAMP --> CAP
+  DMPR --> CAP
+  CAP --> R["Rodapé de indicadores<br/>fórmulas na aba CAP"]
+    </pre>
+
+    <div class="card">
+      <h2>1. Bases de entrada</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Aba / Tabela</th><th>O que contém</th><th>Usada para</th></tr></thead>
+        <tbody>
+          <tr><td>BASE TC · <code>Tabela_BASE_TC</code></td><td>4.719 linhas (teste × método), 732 métodos MPR. Tempo unitário em minutos por etapa (1 a 16), família proposta (<code>FAM proposta</code>) e equipamento proposto (CRLQ/CRGS).</td><td>Tempo de ciclo (TC) de cada etapa</td></tr>
+          <tr><td>DEMANDA · <code>Tabela_DEMANDA</code></td><td>1.453 SKUs com lotes por mês (Jan a Dez/2026), método DocNix, <code>CONSIDERAR?</code>, local de análise, complexidade.</td><td>Demanda da visão Mensal</td></tr>
+          <tr><td>Tabela_DemandaSemanal (SharePoint)</td><td>Consulta ao arquivo <code>Base Quarentena tratada.xlsx</code>, aba <code>Tbela_DemandaSemanal_futura</code>. Lotes em quarentena por semana. Hoje contém só a semana 202645 (196 linhas, 416 lotes).</td><td>Demanda da visão Semanal</td></tr>
+          <tr><td>CAMPANHA · <code>Tabela_BD_CAMPANHA</code></td><td>Lotes por campanha por MPR (média, ex.: MPR00755 = 35,86).</td><td>Regra de campanha</td></tr>
+          <tr><td>SKIP_IMPUREZA · <code>Tabela_SKIP_IMP</code></td><td>Para MPRs de impureza em skip: analisa 1 a cada N lotes (ex.: MPR00048 = 20).</td><td>Regra de skip</td></tr>
+          <tr><td>ETAPAS_CAMPANHAS · <code>Tabela_Lotes_Campanha</code></td><td>% do tempo da etapa que se repete nos lotes seguintes da campanha: etapa 1 = 0%, 6 = 50%, 7 = 50%, 9 = 10%, 10 = 10%, 12 = 10%.</td><td>Regra de campanha</td></tr>
+          <tr><td>FAMÍLIAS · <code>Tabela_FAM</code></td><td>56 linhas (processo × família): pessoas por turno, turnos, OEE real. Ao lado: <code>CALENDARIO_MES</code> e <code>CALENDARIO_SEMANA</code> com horas disponíveis para 1, 2 e 3 turnos.</td><td>Recurso disponível</td></tr>
+          <tr><td>FILTRO_DATA · <code>Tabela_FILTRO</code></td><td>Nível de visão (Mensal/Semanal), mês início/fim, semana (rótulo → chave 202645).</td><td>Período da análise</td></tr>
+          <tr><td>SOMA TEMPOS TOTAIS (consulta)</td><td>Tempo total por método (bancada, equipamento, geral) e a classificação de complexidade 1 a 4.</td><td>Complexidade</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <h2>2. Período e horas disponíveis</h2>
+      <p>O filtro da aba FILTRO_DATA é espelhado em <code>Tabela_FILTRO</code>, que a consulta <code>FILTRO_PERIODO</code> lê. A semana escolhida vira uma chave numérica (<code>Sem 45/2026</code> → <code>202645</code>) por <code>ÍNDICE/CORRESP</code> na tabela de mapeamento.</p>
+      <p>O tempo disponível de cada linha da <code>Tabela_FAM</code> é calculado por fórmula de planilha (coluna HRS TURNO) e depende do mesmo filtro:</p>
+      <div class="formula">RECURSO MÉDIO ATUAL = MÉDIA(Qtde 1º turno; Qtde 2º turno; Qtde 3º turno)
+HRS TURNO           = média, nos períodos ativos, das horas acumuladas para N turnos
+                      Mão de Obra → colunas MO-1 / MO-2 / MO-3      Equipamento → EQP-1 / EQP-2 / EQP-3
+                      Semana 45: MO-3 = 104,22 h · EQP-3 = 107,83 h
+TOTAL RECURSO       = RECURSO MÉDIO ATUAL × HRS TURNO</div>
+      <p class="note">Na consulta <code>FAM_PROPOSTA</code>, HRS TURNO é convertido para número inteiro (104,22 → 104; 107,83 → 108). O TOTAL RECURSO continua usando 104,22, mas o HC NECESSÁRIO usa 104.</p>
+    </div>
+
+    <div class="card">
+      <h2>3. Demanda por método (DEMANDA_MPR)</h2>
+      <div class="formula">Semanal: Demanda_Total = Σ "Lote semana" dos lotes da semana escolhida, por MÉTODO DOCNIX      Num_Meses = 1
+Mensal:  Demanda_Total = Σ lotes dos meses ativos (linhas com CONSIDERAR? = "SIM"), por MÉTODO DOCNIX
+         Demanda_MPR   = Demanda_Total ÷ nº de meses      (a CAP mensal é sempre "por mês médio")</div>
+    </div>
+
+    <div class="card">
+      <h2>4. Carga de minutos por bloco (TC_COM_CAMPANHA)</h2>
+      <p>Cada linha da BASE TC é cruzada com a demanda do seu método. O resultado (<code>CM_Min</code>) é calculado em 8 blocos, um por processo:</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Bloco → linha da CAP</th><th>Etapas somadas</th><th>Campanha (% repetido)</th><th>Agrupa por</th></tr></thead>
+        <tbody>
+          <tr><td>A · MO BANCADA</td><td>1 + 2 + 3 + 6</td><td>etapa 1 (0%) e 6 (50%)</td><td>FAM proposta</td></tr>
+          <tr><td>B · MO CONFERÊNCIA BANCADA / PI/TF</td><td>7 (separa Fam PI/TF das demais)</td><td>etapa 7 (50%)</td><td>linha fixa</td></tr>
+          <tr><td>C · MO EQUIPAMENTO BANCADA</td><td>espectro: AA + ICP + IV + UV</td><td>não</td><td>linha fixa</td></tr>
+          <tr><td>D · MO EQUIPAMENTO</td><td>9 + 14</td><td>etapa 9 (10%)</td><td>linha fixa</td></tr>
+          <tr><td>E · MO CONFERÊNCIA EQUIPAMENTO</td><td>10 + 15</td><td>etapa 10 (10%)</td><td>linha fixa</td></tr>
+          <tr><td>F · REVISÃO FINAL</td><td>16</td><td>não</td><td>linha fixa</td></tr>
+          <tr><td>G · DISSOLUTOR</td><td>8</td><td>não</td><td>linha fixa</td></tr>
+          <tr><td>H · EQUIPAMENTO HPLC / CG</td><td>(nº inj. padrão × tempo) + (nº inj. amostra × tempo)</td><td>corrida padrão, etapa 12 (10%)</td><td>Equipamento proposto</td></tr>
+        </tbody>
+      </table></div>
+      <p>Etapas 4 (repouso), 5 (instrumentos) e 11 (condicionamento) não entram em nenhum bloco.</p>
+      <h3>Regra por linha</h3>
+      <div class="formula">lotes      = Demanda_Total do método
+lotes/camp = ARRED.PARA.CIMA(QTD LOTES CAMPANHA)          nCamp = ARRED.PARA.CIMA(lotes ÷ lotes/camp)
+
+se "Impureza Skip Test":  CM = TC × ARRED.PARA.CIMA(lotes ÷ N_skip) ÷ meses
+se nCamp = 0 (sem campanha):  CM = TC × lotes ÷ meses
+se nCamp = 1:                 CM = TC ÷ meses                (uma campanha só: o tempo entra uma vez)
+se nCamp ≥ 2, nas etapas com % de campanha:
+      CM = [ nCamp × TC  +  (lotes − nCamp) × TC × %repetido ] ÷ meses
+      demais etapas do bloco: TC × lotes ÷ meses</div>
+      <h3>Exemplo real · Semana 45 · MPR00586, teste Uniformidade (Sólidos Dipirona)</h3>
+      <div class="formula" id="exemplo"></div>
+    </div>
+
+    <div class="card">
+      <h2>5. Colunas da CAP</h2>
+      <div class="formula">CM (HRS)            = Σ CM_Min da família ÷ 60
+OEE NEC             = CM (HRS) ÷ TOTAL RECURSO
+CARREGAMENTO        = OEE NEC ÷ OEE REAL            &lt; 0,80 sub · 0,80–1,00 adequado · &gt; 1,00 sobrecarregado
+HC NECESSARIO       = CM (HRS) ÷ (HRS TURNO inteiro × OEE REAL)
+Soma Demanda Media  = Σ Demanda_MPR dos métodos da família (para linhas fixas: dos métodos com a etapa preenchida;
+                      para equipamentos: dos métodos daquele equipamento)
+TAKT                = TOTAL RECURSO ÷ Demanda          (horas disponíveis por lote)
+TC MEDIO            = CM (HRS) ÷ Demanda               (horas consumidas por lote)
+FIFO                = TOTAL RECURSO ÷ TAKT ÷ 22,97     (= Demanda ÷ 22,97)</div>
+      <p class="note">O cruzamento com <code>Tabela_FAM</code> é por (família, processo). Linhas sem recurso cadastrado (Total recurso vazio ou zero) saem da CAP. A coluna <b>Categoria</b> não vem da consulta: está digitada na tabela.</p>
+    </div>
+
+    <div class="card">
+      <h2>6. Rodapé de indicadores (fórmulas na aba CAP_PROPOSTA)</h2>
+      <div class="formula">HC por turno Real       = SUBTOTAL(9; CAP[RECURSO MÉDIO ATUAL])   ← soma só as linhas visíveis (filtro Categoria = Mão de Obra)
+HC real total           = × 3
+HC p/ turno Nec         = SUBTOTAL(9; CAP[HC NECESSARIO])
+HC Nec total            = × 3                   % Ocupação = HC Nec total ÷ HC real total
+% Lotes c/ TC (semana)  = PROCX(semana; tabela dinâmica da DemandaSemanal) → lotes "Tempos OK" ÷ total
+Total lotes (semana)    = lotes "Tempos OK" da semana          Semana útil = 4,58 (digitado)
+Lotes/dia               = Total lotes ÷ dias úteis
+HC p/ turno Corrigido   = HC p/ turno Nec ÷ % Lotes c/ TC      (estima o HC se todos os lotes tivessem TC)
+% Ocupação Corrigido    = HC total Corrigido ÷ HC real total
+Lotes/dia a 100%        = Lotes/dia ÷ % Ocupação Corrigido     (quantos lotes/dia o HC atual comporta)
+
+Bloco "Mês Setembro":   % Lotes c/ TC = DEMANDA!P1460 ÷ DEMANDA!P1459 (lotes com TC ÷ demanda total CQ P30, coluna Set)
+                        Lotes = 1.691 · Mês útil = 22,97 (digitado) · HC Nec = o mesmo da CAP atual</div>
+    </div>
+
+    <div class="card">
+      <h2>7. Complexidade</h2>
+      <p>A consulta <code>SOMA TEMPOS TOTAIS</code> soma, por método, todos os tempos (bancada + equipamento + repouso + revisão). A planilha classifica pelo total geral nas faixas editáveis da própria aba:</p>
+      <div class="formula">Nível 1: ≤ 500 min · Nível 2: ≤ 1.800 min · Nível 3: ≤ 3.500 min · Nível 4: &gt; 3.500 min · 0 = método só de "Check doc"
+Semana: Σ "Lote semana" por nível (tabela dinâmica na aba Tabela_DemandaSemanal)
+Mês:    Σ lotes do mês por nível, só Local de Análise = CQ P30 (tabela dinâmica na aba DEMANDA)</div>
+    </div>
+  </section>
+
+  <!-- ═════════════════════════════ ACHADOS ═════════════════════════════ -->
+  <section class="view doc" id="v-achados" hidden>
+    <div class="prose"><h2>O que encontrei ao refazer o cálculo</h2>
+      <p>Nada abaixo foi alterado no arquivo nem no painel: os resultados continuam iguais. São pontos para você decidir.</p></div>
+    <div class="card" id="findList"></div>
+  </section>
+
+  <!-- ═════════════════════════════ PROPOSTA ═════════════════════════════ -->
+  <section class="view doc" id="v-proposta" hidden>
+    <div class="prose">
+      <h2>Como simplificar sem mudar os resultados</h2>
+      <p>A ideia central: <b>calcular a CAP para todos os períodos de uma vez</b> e deixar a escolha de semana ou mês para um filtro na planilha. A consulta só precisa ser atualizada quando uma base mudar, não a cada troca de período.</p>
+    </div>
+    <div class="card phase">
+      <span class="tag">Etapa 1 · arrumar o que já existe</span>
+      <h3>Rodapé sem números digitados</h3>
+      <ul>
+        <li>Trocar <code>SUBTOTAL</code> (que depende do filtro manual da tabela) por <code>SOMASES(CAP[HC NECESSARIO]; CAP[Categoria]; "Mão de Obra")</code>. O resultado da semana 45 continua 59,48.</li>
+        <li>Buscar dias úteis no calendário pela semana ou mês escolhido, em vez de 4,58 e 22,97 digitados; trocar "Semana 45" e "Mês Setembro" por texto ligado ao filtro.</li>
+        <li>Fazer a <code>Categoria</code> vir da consulta (cruzamento com <code>Tabela_FAM[CATEGORIA]</code>). Testei: reproduz exatamente as 55 linhas atuais.</li>
+        <li>Mostrar os indicadores em cartões, como no painel, com a fórmula escrita embaixo de cada número.</li>
+      </ul>
+    </div>
+    <div class="card phase">
+      <span class="tag">Etapa 2 · filtro instantâneo</span>
+      <h3>Uma consulta, todos os períodos</h3>
+      <ul>
+        <li>Transformar <code>DEMANDA_MPR</code>, <code>TC_COM_CAMPANHA</code> e <code>CAP_PROPOSTA</code> em uma função <code>fnCAP(período)</code> e chamá-la para cada mês, para o ano e para cada semana disponível. Saída: uma tabela longa com a coluna <code>Período</code>.</li>
+        <li>Levar o cálculo de HRS TURNO para dentro do Power Query (a partir de <code>CALENDARIO_MES</code> e <code>CALENDARIO_SEMANA</code>), tirando a dependência da fórmula da <code>Tabela_FAM</code> com o filtro.</li>
+        <li>Nova aba <b>PAINEL</b>: segmentação de dados (Visão, Período, Categoria, Cluster) sobre a tabela longa; cartões do rodapé e complexidade calculados com <code>SOMASES</code>/<code>FILTRO</code> no período escolhido.</li>
+        <li>Complexidade por semana e por mês na mesma tabela longa (nível 1 a 4, lotes e %).</li>
+      </ul>
+    </div>
+    <div class="card phase">
+      <span class="tag">Etapa 3 · histórico semanal</span>
+      <h3>Para filtrar semanas passadas</h3>
+      <p>A base do SharePoint traz só a quarentena atual (hoje, semana 45). Para escolher qualquer semana é preciso guardar um retrato por semana (uma pasta com um arquivo por semana, ou uma aba que acumula). A consulta passa a ler todos os retratos.</p>
+    </div>
+    <div class="card phase">
+      <span class="tag">Etapa 4 · deixar o arquivo leve</span>
+      <h3>Limpeza</h3>
+      <ul>
+        <li>A BASE TC tem ~194 mil fórmulas (colunas CB a DM, com <code>DESLOC</code>) que refazem o mesmo cálculo de campanha à mão. A CAP não usa essas colunas; elas só alimentam a dinâmica da aba SOMA TC CAMP. Com divisores fixos diferentes (÷12, ÷5, ÷6), elas não batem com a CAP.</li>
+        <li>Consultas que não alimentam a CAP: <code>METODOS_EQUIPAMENTO</code>, <code>CAPACIDADE_EQUIPAMENTO</code>, <code>Tabela_DEMANDA</code>. Abas ocultas ou auxiliares: Proposta FAM, Famílias_MPR, BD FAM EQUIP, HEIJUNKA, Planilha1, Class_Testes.</li>
+        <li>Só remover depois de você confirmar que ninguém usa essas abas para outro fim.</li>
+      </ul>
+    </div>
+    <div class="card phase">
+      <span class="tag">Decisões que dependem de você</span>
+      <h3>Antes de mexer no cálculo</h3>
+      <ul id="decisoes"></ul>
+    </div>
+    <div class="card phase">
+      <span class="tag">Alternativa</span>
+      <h3>Power BI</h3>
+      <p>As mesmas consultas rodam no Power BI sem reescrita grande, com filtros nativos e atualização agendada no SharePoint. Faz sentido se o painel for compartilhado com mais pessoas; para uso da equipe no Excel, as etapas 1 e 2 já resolvem.</p>
+    </div>
+  </section>
+
+  <!-- ═════════════════════════════ VALIDAÇÃO ═════════════════════════════ -->
+  <section class="view doc" id="v-validacao" hidden>
+    <div class="prose">
+      <h2>Como sei que os números são os mesmos</h2>
+      <p>Refiz todas as consultas Power Query e as fórmulas da planilha linha a linha em um script, lendo os valores que o próprio Excel salvou no arquivo. Depois comparei com o que está gravado na aba CAP_PROPOSTA.</p>
+    </div>
+    <div class="grid-kpi" id="valKpis"></div>
+    <div class="card"><h2>Rodapé, bloco de setembro e complexidade</h2>
+      <div class="tablewrap"><table id="tblVal"><thead><tr><th>Indicador</th><th class="n">No arquivo</th><th class="n">Recalculado</th><th>Resultado</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="card prose" style="max-width:none">
+      <h2>O que não deu para conferir</h2>
+      <p>A visão <b>Mensal</b> não tem uma CAP salva no arquivo atual para comparar. Ela usa as mesmas consultas da semanal; só mudam a soma da demanda (meses ÷ nº de meses) e a média das horas do calendário. A versão de 25/09 está em visão mensal, mas a CAP salva nela está desatualizada em relação às próprias bases (ex.: MO EQUIPAMENTO com recurso 13,33 na CAP e 13,01 na aba FAMÍLIAS), então não serve de referência.</p>
+      <p><b>Para conferir no Excel:</b> mude FILTRO_DATA para Mensal, Set/2026 a Set/2026, clique em Atualizar Tudo e compare com estas linhas:</p>
+      <div class="tablewrap"><table id="tblSet"><thead><tr><th>Família</th><th class="n">CM (HRS)</th><th class="n">HC NECESSARIO</th><th class="n">CARREGAMENTO</th><th class="n">Soma Demanda</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const MESES = ["Jan/2026","Fev/2026","Mar/2026","Abr/2026","Mai/2026","Jun/2026","Jul/2026","Ago/2026","Set/2026","Out/2026","Nov/2026","Dez/2026"];
+const $ = (s) => document.querySelector(s);
+const nf = (d) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(v)) ? '—' : nf(d).format(v);
+const pct = (v, d = 1) => (v === null || v === undefined) ? '—' : nf(d).format(v * 100) + '%';
+const status = (c) => c === null || c === undefined ? null : (c > 1 ? 'bad' : (c >= 0.8 ? 'ok' : 'sub'));
+const STATUS_TXT = { bad: 'Sobrecarregado', ok: 'Adequado', sub: 'Sub-utilizado' };
+const COLS = DATA.cols;
+const IDX = Object.fromEntries(COLS.map((c, i) => [c, i]));
+
+const state = { visao: 'Semanal', semana: DATA.semanas[0].id, ini: 8, fim: 8, cat: 'Mão de Obra', st: '', sort: null, asc: false };
+try { const s = JSON.parse(localStorage.getItem('capFiltros') || 'null'); if (s) Object.assign(state, s, { sort: null }); } catch (e) {}
+function save() { try { localStorage.setItem('capFiltros', JSON.stringify({ visao: state.visao, ini: state.ini, fim: state.fim, cat: state.cat, st: state.st })); } catch (e) {} }
+
+function periodo() {
+  const id = state.visao === 'Semanal' ? state.semana : `M${state.ini + 1}-${state.fim + 1}`;
+  return DATA.periodos[id];
+}
+function rowsOf(p) {
+  return p.rows.map((vals) => { const o = {}; COLS.forEach((c, i) => { o[c] = vals[i]; }); const k = DATA.linhas[vals[IDX['_k']]]; o.PROCESSO = k[0]; o.FAMILIA = k[1]; o.CLUSTER = k[2]; o.Categoria = k[3]; return o; });
+}
+
+/* ── filtros ── */
+function initFilters() {
+  const ss = $('#selSemana'); DATA.semanas.forEach((s) => ss.add(new Option(s.rotulo, s.id)));
+  [$('#selMesIni'), $('#selMesFim')].forEach((sel) => MESES.forEach((m, i) => sel.add(new Option(m, i))));
+  document.querySelectorAll('#segVisao button').forEach((b) => b.addEventListener('click', () => { state.visao = b.dataset.v; save(); render(); }));
+  ss.addEventListener('change', () => { state.semana = ss.value; render(); });
+  $('#selMesIni').addEventListener('change', (e) => { state.ini = +e.target.value; if (state.fim < state.ini) state.fim = state.ini; save(); render(); });
+  $('#selMesFim').addEventListener('change', (e) => { state.fim = +e.target.value; if (state.fim < state.ini) state.ini = state.fim; save(); render(); });
+  $('#selCat').addEventListener('change', (e) => { state.cat = e.target.value; save(); render(); });
+  $('#selStatus').addEventListener('change', (e) => { state.st = e.target.value; save(); render(); });
+}
+function syncFilters() {
+  const sem = state.visao === 'Semanal';
+  $('#btnSem').setAttribute('aria-pressed', sem); $('#btnMes').setAttribute('aria-pressed', !sem);
+  $('#fSemana').hidden = !sem; $('#fMesIni').hidden = sem; $('#fMesFim').hidden = sem;
+  $('#selSemana').value = state.semana; $('#selMesIni').value = state.ini; $('#selMesFim').value = state.fim;
+  $('#selCat').value = state.cat; $('#selStatus').value = state.st;
+}
+
+/* ── indicadores ── */
+function gauge(v, label) {
+  const max = 1.5, W = 300, H = 34, x = (u) => 4 + Math.min(u, max) / max * (W - 8);
+  const s = status(v), col = s === 'bad' ? 'var(--bad)' : s === 'ok' ? 'var(--ok)' : 'var(--sub)';
+  return `<div class="gauge"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${label}: ${pct(v)}">
+    <rect x="4" y="8" width="${W - 8}" height="8" rx="4" fill="var(--line-2)"/>
+    <rect x="4" y="8" width="${Math.max(0, x(v) - 4)}" height="8" rx="4" fill="${col}"/>
+    ${[0.8, 1].map((r) => `<line x1="${x(r)}" x2="${x(r)}" y1="4" y2="20" stroke="var(--ink-3)" stroke-dasharray="2 2"/><text x="${x(r)}" y="31" text-anchor="middle" font-size="10" fill="var(--ink-3)">${pct(r, 0)}</text>`).join('')}
+    <text x="4" y="31" font-size="10" fill="var(--ink-3)">0%</text><text x="${W - 4}" y="31" text-anchor="end" font-size="10" fill="var(--ink-3)">150%</text>
+  </svg></div>`;
+}
+function kpi(l, v, f, cls = '') { return `<div class="kpi ${cls}"><span class="l">${l}</span><span class="v">${v}</span><span class="f">${f}</span></div>`; }
+function renderKpis(p) {
+  const r = p.rodape, sem = p.tipo === 'Semanal';
+  const sOc = status(r.ocupacao_corr);
+  $('#kpis').innerHTML = `
+    <div class="card kgroup"><h3>Pessoas (Mão de Obra)</h3>
+      ${kpi('HC por turno real', fmt(r.hc_turno_real), 'Σ Recurso médio atual')}
+      ${kpi('HC real total', fmt(r.hc_real_total), 'HC por turno × 3 turnos')}
+      ${kpi('HC por turno necessário', fmt(r.hc_turno_nec), 'Σ HC NECESSARIO')}
+      ${kpi('HC necessário total', fmt(r.hc_nec_total), 'HC necessário por turno × 3')}
+    </div>
+    <div class="card kgroup"><h3>Ocupação</h3>
+      ${kpi('% Ocupação', pct(r.ocupacao), 'HC necessário total ÷ HC real total', 'hero')}
+      ${gauge(r.ocupacao, '% Ocupação')}
+      ${kpi('% Lotes com TC', pct(r.pct_lotes_tc), sem ? 'lotes "Tempos OK" ÷ lotes da semana' : 'lotes com TC ÷ demanda CQ P30')}
+      ${kpi('HC por turno corrigido', fmt(r.hc_turno_corr), 'HC por turno necessário ÷ % lotes com TC')}
+    </div>
+    <div class="card kgroup"><h3>Ocupação corrigida <span class="chip ${sOc === 'bad' ? 'bad' : sOc === 'ok' ? 'ok' : 'info'}" style="margin-left:6px">${STATUS_TXT[sOc]}</span></h3>
+      ${kpi('% Ocupação corrigida', pct(r.ocupacao_corr), 'HC total corrigido ÷ HC real total', 'hero')}
+      ${gauge(r.ocupacao_corr, '% Ocupação corrigida')}
+      ${kpi('HC total corrigido', fmt(r.hc_total_corr), 'HC por turno corrigido × 3')}
+    </div>
+    <div class="card kgroup"><h3>Fluxo de lotes</h3>
+      ${kpi(sem ? 'Lotes da semana (com TC)' : (p.n_meses > 1 ? 'Lotes por mês (média)' : 'Lotes do mês'), fmt(r.total_lotes, sem ? 0 : 0), sem ? 'Status2 = "Tempos OK"' : 'demanda total CQ P30')}
+      ${kpi(sem ? 'Dias úteis da semana' : 'Dias úteis no mês', fmt(r.dias_uteis), sem ? 'calendário semanal' : 'constante 22,97 do arquivo')}
+      ${kpi('Lotes por dia', fmt(r.lotes_dia, 1), 'lotes ÷ dias úteis')}
+      ${kpi('Lotes por dia a 100%', fmt(r.lotes_dia_100, 1), 'lotes por dia ÷ % ocupação corrigida', 'hero')}
+    </div>`;
+}
+
+/* ── tooltip ── */
+const tip = $('#tip');
+function showTip(e, html) { tip.innerHTML = html; tip.hidden = false; const pad = 12, w = tip.offsetWidth, h = tip.offsetHeight; let x = e.clientX + pad, y = e.clientY + pad; if (x + w > innerWidth - 8) x = e.clientX - w - pad; if (y + h > innerHeight - 8) y = e.clientY - h - pad; tip.style.left = Math.max(8, x) + 'px'; tip.style.top = Math.max(8, y) + 'px'; }
+function hideTip() { tip.hidden = true; }
+const trow = (a, b) => `<div class="r"><span>${a}</span><span>${b}</span></div>`;
+
+/* ── carregamento ── */
+function renderCarr(rows) {
+  const el = $('#chartCarr');
+  const data = rows.filter((r) => r.CARREGAMENTO !== null).sort((a, b) => b.CARREGAMENTO - a.CARREGAMENTO);
+  if (!data.length) { el.innerHTML = '<p class="basis">Nenhuma linha com esses filtros.</p>'; return; }
+  const W = Math.max(320, el.clientWidth || 600), labW = Math.min(190, W * 0.38), rh = 22, H = data.length * rh + 26;
+  const max = Math.max(1.2, ...data.map((d) => d.CARREGAMENTO)) * 1.08;
+  const x = (v) => labW + v / max * (W - labW - 52);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Carregamento por família">`;
+  [0.8, 1].forEach((r) => { s += `<line class="ref" x1="${x(r)}" x2="${x(r)}" y1="0" y2="${H - 18}"/><text x="${x(r)}" y="${H - 4}" text-anchor="middle">${fmt(r)}</text>`; });
+  data.forEach((d, i) => {
+    const y = i * rh, st = status(d.CARREGAMENTO), col = st === 'bad' ? 'var(--bad)' : st === 'ok' ? 'var(--ok)' : 'var(--sub)';
+    const name = d.FAMILIA.length > 28 ? d.FAMILIA.slice(0, 27) + '…' : d.FAMILIA;
+    s += `<g class="bar" data-i="${i}" tabindex="0"><rect x="0" y="${y}" width="${W}" height="${rh}" fill="transparent"/>
+      <text x="${labW - 8}" y="${y + 15}" text-anchor="end">${esc(name)}</text>
+      <rect x="${labW}" y="${y + 5}" width="${Math.max(2, x(d.CARREGAMENTO) - labW)}" height="${rh - 10}" rx="3" fill="${col}"/>
+      <text x="${x(d.CARREGAMENTO) + 5}" y="${y + 15}" style="fill:var(--ink)">${pct(d.CARREGAMENTO, 0)}</text></g>`;
+  });
+  el.innerHTML = s + '</svg>';
+  el.querySelectorAll('g.bar').forEach((g) => {
+    const d = data[+g.dataset.i];
+    const h = (e) => showTip(e, `<b>${esc(d.FAMILIA)}</b>${trow('Processo', esc(d.PROCESSO))}${trow('Carregamento', pct(d.CARREGAMENTO))}${trow('CM (h)', fmt(d['CM (HRS)']))}${trow('Total recurso (h)', fmt(d['TOTAL RECURSO']))}${trow('OEE real', pct(d['OEE REAL']))}${trow('HC necessário', fmt(d['HC NECESSARIO']))}${trow('Recurso atual', fmt(d['RECURSO MÉDIO ATUAL']))}${trow('Demanda (lotes)', fmt(d['Soma Demanda Media']))}`);
+    g.addEventListener('mousemove', h); g.addEventListener('mouseleave', hideTip);
+    g.addEventListener('focus', (e) => { const b = g.getBoundingClientRect(); h({ clientX: b.left + b.width / 2, clientY: b.top }); }); g.addEventListener('blur', hideTip);
+  });
+}
+
+/* ── complexidade ── */
+const FAIXA = { '1': '≤ 500 min', '2': '501 a 1.800 min', '3': '1.801 a 3.500 min', '4': '> 3.500 min' };
+function renderCx(p) {
+  const c = p.complexidade, lv = ['1', '2', '3', '4'], tot = lv.reduce((a, k) => a + (c[k] || 0), 0);
+  const sem = p.tipo === 'Semanal';
+  $('#cxSub').textContent = sem ? 'Lotes em quarentena da semana por nível (Σ Lote semana).' : (p.n_meses > 1 ? 'Lotes por mês (média do intervalo), CQ P30, por nível.' : 'Lotes do mês, CQ P30, por nível.');
+  const el = $('#chartCx'); const W = Math.max(300, el.clientWidth || 400), H = 46;
+  let x = 0, s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Distribuição de complexidade">`;
+  lv.forEach((k) => { const v = c[k] || 0, w = tot ? v / tot * W : 0; if (w > 0) { s += `<g class="cx" data-k="${k}"><rect x="${x + (x ? 1 : 0)}" y="0" width="${Math.max(0, w - (x ? 1 : 0) - 1)}" height="26" rx="3" fill="var(--cx${k})"/>${w > 46 ? `<text x="${x + w / 2}" y="17" text-anchor="middle" style="fill:${k === '1' ? '#0b2540' : '#fff'};font-weight:600">${pct(v / tot, 0)}</text>` : ''}<text x="${x + 2}" y="41">${'N' + k}</text></g>`; } x += w; });
+  el.innerHTML = s + '</svg>';
+  el.querySelectorAll('g.cx').forEach((g) => { const k = g.dataset.k; g.addEventListener('mousemove', (e) => showTip(e, `<b>Nível ${k}</b>${trow('Tempo total', FAIXA[k])}${trow('Lotes', fmt(c[k] || 0, 1))}${trow('% (1 a 4)', pct((c[k] || 0) / tot))}`)); g.addEventListener('mouseleave', hideTip); });
+  $('#tblCx tbody').innerHTML = lv.map((k) => `<tr><td><span class="pill"><span class="dot" style="background:var(--cx${k})"></span>Nível ${k}</span></td><td>${FAIXA[k]}</td><td class="n">${fmt(c[k] || 0, sem ? 0 : 1)}</td><td class="n">${pct((c[k] || 0) / tot)}</td></tr>`).join('') +
+    `<tr><td><b>Total 1 a 4</b></td><td></td><td class="n"><b>${fmt(tot, sem ? 0 : 1)}</b></td><td class="n">100,0%</td></tr>`;
+  $('#cxNote').textContent = `Fora da conta de %: ${fmt(c['0'] || 0, sem ? 0 : 1)} lotes nível 0 (método só "Check doc") e ${fmt(c['sem'] || 0, sem ? 0 : 1)} lotes sem classificação (método não encontrado na BASE TC). Mesmo critério das tabelas dinâmicas do arquivo.`;
+}
+
+/* ── tabela CAP ── */
+const TCOLS = [
+  ['PROCESSO', 'Processo', 's'], ['FAMILIA', 'Família', 's'], ['CLUSTER', 'Cluster', 's'], ['Categoria', 'Categoria', 's'],
+  ['CM (HRS)', 'CM (h)', 2], ['RECURSO MÉDIO ATUAL', 'Recurso médio', 2], ['TOTAL RECURSO', 'Total recurso (h)', 2], ['HRS TURNO', 'Hrs turno', 0],
+  ['OEE REAL', 'OEE real', 'p'], ['OEE NEC', 'OEE nec.', 'p'], ['HC NECESSARIO', 'HC nec.', 2], ['CARREGAMENTO', 'Carregamento', 'c'],
+  ['Soma Demanda Media', 'Demanda', 2], ['TAKT', 'TAKT', 2], ['TC MEDIO', 'TC médio', 2], ['FIFO', 'FIFO', 2]];
+function renderTable(rows) {
+  const th = TCOLS.map(([k, l, t]) => `<th class="${t === 's' ? '' : 'n'}"><button type="button" data-k="${k}">${l}${state.sort === k ? (state.asc ? ' ▲' : ' ▼') : ''}</button></th>`).join('');
+  $('#tblCap thead').innerHTML = `<tr>${th}</tr>`;
+  let rs = rows.slice();
+  if (state.sort) rs.sort((a, b) => { const x = a[state.sort], y = b[state.sort]; const r = (typeof x === 'string' || typeof y === 'string') ? String(x ?? '').localeCompare(String(y ?? ''), 'pt') : (x ?? -1e9) - (y ?? -1e9); return state.asc ? r : -r; });
+  $('#tblCap tbody').innerHTML = rs.map((r) => '<tr>' + TCOLS.map(([k, , t]) => {
+    const v = r[k];
+    if (t === 's') return `<td>${esc(v ?? '')}</td>`;
+    if (t === 'p') return `<td class="n">${pct(v)}</td>`;
+    if (t === 'c') { const s = status(v); return `<td class="n">${s ? `<span class="pill ${s}" title="${STATUS_TXT[s]}"><span class="dot"></span>${pct(v, 2)}</span>` : '—'}</td>`; }
+    return `<td class="n">${fmt(v, t)}</td>`;
+  }).join('') + '</tr>').join('');
+  $('#tblCap thead').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { if (state.sort === b.dataset.k) state.asc = !state.asc; else { state.sort = b.dataset.k; state.asc = false; } renderTable(rows); }));
+  const nb = rows.filter((r) => status(r.CARREGAMENTO) === 'bad').length;
+  $('#tblCount').textContent = `${rows.length} linhas · ${nb} sobrecarregadas`;
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function render() {
+  syncFilters();
+  const p = periodo();
+  $('#perLabel').textContent = p.rotulo;
+  $('#perBasis').textContent = p.tipo === 'Semanal'
+    ? 'Demanda: lotes em quarentena da semana (SharePoint). Horas: calendário semanal. Indicadores: mesmas fórmulas do rodapé da CAP.'
+    : `Demanda: ${p.n_meses > 1 ? 'média mensal dos lotes do intervalo' : 'lotes do mês'} (aba DEMANDA). Horas: média mensal do calendário. Indicadores calculados com a CAP deste período.`;
+  renderKpis(p);
+  const all = rowsOf(p);
+  const rows = all.filter((r) => (!state.cat || r.Categoria === state.cat) && (!state.st || status(r.CARREGAMENTO) === state.st));
+  renderCarr(rows); renderCx(p); renderTable(rows);
+}
+
+/* ── páginas estáticas ── */
+function renderDocs() {
+  $('#exemplo').textContent = DATA.exemplo;
+  $('#findList').innerHTML = DATA.achados.map((a) => `<div class="find"><span class="chip ${a.nivel}">${a.tag}</span><span class="what">${a.titulo}</span><span class="det">${a.det}</span></div>`).join('');
+  $('#decisoes').innerHTML = DATA.decisoes.map((d) => `<li>${d}</li>`).join('');
+  const v = DATA.validacao;
+  $('#valKpis').innerHTML = `<div class="card kgroup"><h3>CAP · Semana 45</h3>${kpi('Linhas', fmt(v.linhas, 0), 'iguais nas duas versões')}${kpi('Valores comparados', fmt(v.valores, 0), 'linhas × 14 colunas')}${kpi('Diferenças', fmt(v.diferencas, 0), 'tolerância 1e-9', 'hero')}</div>
+    <div class="card kgroup"><h3>Indicadores</h3>${kpi('Conferidos', fmt(v.checks.length, 0), 'rodapé, setembro e complexidade')}${kpi('Diferenças', fmt(v.checks.filter((c) => !c.ok).length, 0), 'tolerância 1e-9', 'hero')}</div>`;
+  $('#tblVal tbody').innerHTML = v.checks.map((c) => `<tr><td>${esc(c.nome)}</td><td class="n">${fmt(c.arq, 4)}</td><td class="n">${fmt(c.calc, 4)}</td><td>${c.ok ? '<span class="pill ok"><span class="dot"></span>igual</span>' : '<span class="pill bad"><span class="dot"></span>diferente</span>'}</td></tr>`).join('');
+  const set = rowsOf(DATA.periodos['M9-9']).filter((r) => r.Categoria === 'Mão de Obra');
+  $('#tblSet tbody').innerHTML = set.map((r) => `<tr><td>${esc(r.FAMILIA)}</td><td class="n">${fmt(r['CM (HRS)'])}</td><td class="n">${fmt(r['HC NECESSARIO'])}</td><td class="n">${pct(r.CARREGAMENTO, 2)}</td><td class="n">${fmt(r['Soma Demanda Media'])}</td></tr>`).join('');
+}
+
+/* ── abas ── */
+const TABS = ['painel', 'racional', 'achados', 'proposta', 'validacao'];
+function route() {
+  const h = location.hash.replace('#', ''); const t = TABS.includes(h) ? h : 'painel';
+  TABS.forEach((k) => { $('#v-' + k).hidden = k !== t; });
+  document.querySelectorAll('nav.tabs a').forEach((a) => { if (a.dataset.tab === t) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  if (t === 'painel') render();
+}
+initFilters(); renderDocs(); route();
+addEventListener('hashchange', route);
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (!$('#v-painel').hidden) render(); }, 150); });
+</script>
