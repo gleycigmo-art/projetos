@@ -316,12 +316,14 @@ Soma Demanda Media  = Σ Demanda_MPR dos métodos da família (para linhas fixas
                       para equipamentos: dos métodos daquele equipamento)
 TAKT                = TOTAL RECURSO ÷ Demanda          (horas disponíveis por lote)
 TC MEDIO            = CM (HRS) ÷ Demanda               (horas consumidas por lote)
-FIFO                = TOTAL RECURSO ÷ TAKT ÷ 22,97     (= Demanda ÷ 22,97)</div>
+FIFO                = TOTAL RECURSO ÷ TAKT ÷ 22,97     (= Demanda ÷ 22,97)
+                      no PAINEL novo: ÷ dias úteis do período no calendário (semana 45 = 4,58; setembro = 25)</div>
       <p class="note">O cruzamento com <code>Tabela_FAM</code> é por (família, processo). Linhas sem recurso cadastrado (Total recurso vazio ou zero) saem da CAP. A coluna <b>Categoria</b> não vem da consulta: está digitada na tabela.</p>
     </div>
 
     <div class="card">
       <h2>6. Rodapé de indicadores (fórmulas na aba CAP_PROPOSTA)</h2>
+      <p class="note">Assim está hoje no arquivo. No PAINEL novo: soma por Categoria (sem depender do filtro), dias úteis do calendário, e intervalo de meses = média dos meses.</p>
       <div class="formula">HC por turno Real       = SUBTOTAL(9; CAP[RECURSO MÉDIO ATUAL])   ← soma só as linhas visíveis (filtro Categoria = Mão de Obra)
 HC real total           = × 3
 HC p/ turno Nec         = SUBTOTAL(9; CAP[HC NECESSARIO])
@@ -356,52 +358,45 @@ Mês:    Σ lotes do mês por nível, só Local de Análise = CQ P30 (tabela din
   <!-- ═════════════════════════════ PROPOSTA ═════════════════════════════ -->
   <section class="view doc" id="v-proposta" hidden>
     <div class="prose">
-      <h2>Como simplificar sem mudar os resultados</h2>
-      <p>A ideia central: <b>calcular a CAP para todos os períodos de uma vez</b> e deixar a escolha de semana ou mês para um filtro na planilha. A consulta só precisa ser atualizada quando uma base mudar, não a cada troca de período.</p>
+      <h2>Kit para o Excel: PAINEL com filtro instantâneo</h2>
+      <p>A CAP passa a ser calculada <b>para todos os meses e semanas de uma vez</b>. Trocar o período no PAINEL é imediato; o Atualizar Tudo só é necessário quando uma base mudar. As consultas e abas atuais continuam no arquivo, sem alteração, até você decidir removê-las.</p>
     </div>
     <div class="card phase">
-      <span class="tag">Etapa 1 · arrumar o que já existe</span>
-      <h3>Rodapé sem números digitados</h3>
+      <span class="tag">O que o kit adiciona</span>
+      <h3>9 consultas novas e 3 abas</h3>
       <ul>
-        <li>Trocar <code>SUBTOTAL</code> (que depende do filtro manual da tabela) por <code>SOMASES(CAP[HC NECESSARIO]; CAP[Categoria]; "Mão de Obra")</code>. O resultado da semana 45 continua 59,48.</li>
-        <li>Buscar dias úteis no calendário pela semana ou mês escolhido, em vez de 4,58 e 22,97 digitados; trocar "Semana 45" e "Mês Setembro" por texto ligado ao filtro.</li>
-        <li>Fazer a <code>Categoria</code> vir da consulta (cruzamento com <code>Tabela_FAM[CATEGORIA]</code>). Testei: reproduz exatamente as 55 linhas atuais.</li>
-        <li>Mostrar os indicadores em cartões, como no painel, com a fórmula escrita embaixo de cada número.</li>
+        <li><code>fnDEMANDA_MPR</code>, <code>fnTC_COM_CAMPANHA</code> e <code>fnCAP</code>: o corpo das suas consultas atuais, copiado sem reescrever a lógica, transformado em função do período.</li>
+        <li><code>fnFAM_PROPOSTA</code> e <code>fnCALENDARIO_ATIVO</code>: as horas do turno de cada período, com a mesma regra da coluna HRS TURNO da aba FAMÍLIAS.</li>
+        <li><code>v2_CAP_PERIODOS</code>: a CAP de Jan a Dez e de cada semana da base de quarentena, numa tabela só (aba CAP_PERIODOS).</li>
+        <li>Aba <b>PAINEL</b>: filtros (Visão, Semana, Mês início, Mês fim), indicadores com a fórmula escrita ao lado, complexidade com barra, quadro mês a mês, CAP do período com status colorido e filtro por Categoria, e a conferência com a CAP antiga.</li>
+        <li>Duas mudanças na CAP: a <b>Categoria</b> vem da Tabela_FAM e o <b>FIFO</b> usa os dias úteis do calendário. Todo o resto é o cálculo atual.</li>
       </ul>
     </div>
     <div class="card phase">
-      <span class="tag">Etapa 2 · filtro instantâneo</span>
-      <h3>Uma consulta, todos os períodos</h3>
-      <ul>
-        <li>Transformar <code>DEMANDA_MPR</code>, <code>TC_COM_CAMPANHA</code> e <code>CAP_PROPOSTA</code> em uma função <code>fnCAP(período)</code> e chamá-la para cada mês, para o ano e para cada semana disponível. Saída: uma tabela longa com a coluna <code>Período</code>.</li>
-        <li>Levar o cálculo de HRS TURNO para dentro do Power Query (a partir de <code>CALENDARIO_MES</code> e <code>CALENDARIO_SEMANA</code>), tirando a dependência da fórmula da <code>Tabela_FAM</code> com o filtro.</li>
-        <li>Nova aba <b>PAINEL</b>: segmentação de dados (Visão, Período, Categoria, Cluster) sobre a tabela longa; cartões do rodapé e complexidade calculados com <code>SOMASES</code>/<code>FILTRO</code> no período escolhido.</li>
-        <li>Complexidade por semana e por mês na mesma tabela longa (nível 1 a 4, lotes e %).</li>
-      </ul>
+      <span class="tag">Como instalar</span>
+      <h3>Numa cópia do arquivo</h3>
+      <ol>
+        <li>Baixe a pasta <code>analise_cap/excel_kit</code> do repositório (arquivo <code>MontarPainel.bas</code> e pasta <code>consultas</code>).</li>
+        <li>Abra uma <b>cópia</b> do MFV_CQPA. Alt+F11 → Arquivo → Importar arquivo → <code>MontarPainel.bas</code>.</li>
+        <li>Alt+F8 → <code>MontarPainelCAP</code> → Executar. Escolha a pasta <code>consultas</code> quando pedir.</li>
+        <li>Espere o cálculo (12 meses + semanas). No fim, confira o quadro <b>Conferência</b>: com Visão = Semanal e a mesma semana do FILTRO_DATA, as três diferenças devem ser 0,0000.</li>
+        <li>Se tudo bater, pode apagar o módulo do macro (o PAINEL funciona sem ele).</li>
+      </ol>
     </div>
     <div class="card phase">
-      <span class="tag">Etapa 3 · histórico semanal</span>
-      <h3>Para filtrar semanas passadas</h3>
-      <p>A base do SharePoint traz só a quarentena atual (hoje, semana 45). Para escolher qualquer semana é preciso guardar um retrato por semana (uma pasta com um arquivo por semana, ou uma aba que acumula). A consulta passa a ler todos os retratos.</p>
-    </div>
-    <div class="card phase">
-      <span class="tag">Etapa 4 · deixar o arquivo leve</span>
-      <h3>Limpeza</h3>
-      <ul>
-        <li>A BASE TC tem ~194 mil fórmulas (colunas CB a DM, com <code>DESLOC</code>) que refazem o mesmo cálculo de campanha à mão. A CAP não usa essas colunas; elas só alimentam a dinâmica da aba SOMA TC CAMP. Com divisores fixos diferentes (÷12, ÷5, ÷6), elas não batem com a CAP.</li>
-        <li>Consultas que não alimentam a CAP: <code>METODOS_EQUIPAMENTO</code>, <code>CAPACIDADE_EQUIPAMENTO</code>, <code>Tabela_DEMANDA</code>. Abas ocultas ou auxiliares: Proposta FAM, Famílias_MPR, BD FAM EQUIP, HEIJUNKA, Planilha1, Class_Testes.</li>
-        <li>Só remover depois de você confirmar que ninguém usa essas abas para outro fim.</li>
-      </ul>
-    </div>
-    <div class="card phase">
-      <span class="tag">Decisões que dependem de você</span>
-      <h3>Antes de mexer no cálculo</h3>
+      <span class="tag">Decisões de 30/10</span>
+      <h3>Regras adotadas</h3>
       <ul id="decisoes"></ul>
     </div>
     <div class="card phase">
-      <span class="tag">Alternativa</span>
-      <h3>Power BI</h3>
-      <p>As mesmas consultas rodam no Power BI sem reescrita grande, com filtros nativos e atualização agendada no SharePoint. Faz sentido se o painel for compartilhado com mais pessoas; para uso da equipe no Excel, as etapas 1 e 2 já resolvem.</p>
+      <span class="tag">Próximos passos sugeridos</span>
+      <h3>Depois de validar o PAINEL</h3>
+      <ul>
+        <li><b>Histórico semanal:</b> a base do SharePoint só traz a quarentena atual. Guardando um retrato por semana, o filtro passa a mostrar semanas passadas sem mudar nada no PAINEL.</li>
+        <li><b>Limpeza:</b> a BASE TC tem ~194 mil fórmulas com DESLOC (colunas CB a DM) que refazem o cálculo por fora e deixam o arquivo lento. Junto com as consultas METODOS_EQUIPAMENTO, CAPACIDADE_EQUIPAMENTO e Tabela_DEMANDA e as abas auxiliares, podem sair depois que você confirmar que ninguém as usa.</li>
+        <li><b>Aposentar a CAP_PROPOSTA antiga</b> e a aba FILTRO_DATA, quando o PAINEL estiver em uso.</li>
+        <li><b>Power BI</b>, se o painel for compartilhado com mais áreas: as mesmas consultas rodam lá com atualização agendada.</li>
+      </ul>
     </div>
   </section>
 
@@ -416,9 +411,11 @@ Mês:    Σ lotes do mês por nível, só Local de Análise = CQ P30 (tabela din
       <div class="tablewrap"><table id="tblVal"><thead><tr><th>Indicador</th><th class="n">No arquivo</th><th class="n">Recalculado</th><th>Resultado</th></tr></thead><tbody></tbody></table></div>
     </div>
     <div class="card prose" style="max-width:none">
-      <h2>O que não deu para conferir</h2>
-      <p>A visão <b>Mensal</b> não tem uma CAP salva no arquivo atual para comparar. Ela usa as mesmas consultas da semanal; só mudam a soma da demanda (meses ÷ nº de meses) e a média das horas do calendário. A versão de 25/09 está em visão mensal, mas a CAP salva nela está desatualizada em relação às próprias bases (ex.: MO EQUIPAMENTO com recurso 13,33 na CAP e 13,01 na aba FAMÍLIAS), então não serve de referência.</p>
-      <p><b>Para conferir no Excel:</b> mude FILTRO_DATA para Mensal, Set/2026 a Set/2026, clique em Atualizar Tudo e compare com estas linhas:</p>
+      <h2>O que muda em relação ao arquivo (decisões de 30/10)</h2>
+      <ul id="mudancas"></ul>
+      <h2>O que só dá para conferir no Excel</h2>
+      <p>As consultas Power Query novas não rodam fora do Excel. Por isso a aba PAINEL tem um quadro de <b>Conferência</b>: com a mesma semana do FILTRO_DATA, as diferenças de CM, HC e carregamento contra a CAP_PROPOSTA atual devem dar 0,0000. A visão mensal também não tem CAP salva no arquivo para comparar; a versão de 25/09 está com a CAP desatualizada em relação às próprias bases (ex.: MO EQUIPAMENTO com recurso 13,33 na CAP e 13,01 na aba FAMÍLIAS) e não serve de referência.</p>
+      <p><b>Conferência mensal no Excel:</b> no FILTRO_DATA, escolha Mensal, Set/2026 a Set/2026 e Atualizar Tudo; no PAINEL, escolha Mensal, Set/2026. A conferência deve dar 0,0000 e a CAP_PROPOSTA antiga deve bater com estas linhas (exceto FIFO, que agora usa o calendário):</p>
       <div class="tablewrap"><table id="tblSet"><thead><tr><th>Família</th><th class="n">CM (HRS)</th><th class="n">HC NECESSARIO</th><th class="n">CARREGAMENTO</th><th class="n">Soma Demanda</th></tr></thead><tbody></tbody></table></div>
     </div>
   </section>
@@ -441,9 +438,22 @@ const state = { visao: 'Semanal', semana: DATA.semanas[0].id, ini: 8, fim: 8, ca
 try { const s = JSON.parse(localStorage.getItem('capFiltros') || 'null'); if (s) Object.assign(state, s, { sort: null }); } catch (e) {}
 function save() { try { localStorage.setItem('capFiltros', JSON.stringify({ visao: state.visao, ini: state.ini, fim: state.fim, cat: state.cat, st: state.st })); } catch (e) {} }
 
+const CACHE = {};
 function periodo() {
-  const id = state.visao === 'Semanal' ? state.semana : `M${state.ini + 1}-${state.fim + 1}`;
-  return DATA.periodos[id];
+  if (state.visao === 'Semanal') return DATA.periodos[state.semana];
+  if (state.ini === state.fim) return DATA.periodos[`M${state.ini + 1}`];
+  const id = `M${state.ini + 1}-${state.fim + 1}`;
+  if (!CACHE[id]) CACHE[id] = mediaMeses(state.ini, state.fim);
+  return CACHE[id];
+}
+/* intervalo de meses = média simples de cada número, mês a mês (vazios ignorados, como MÉDIASES) */
+function avg(vs) { const v = vs.filter((x) => x !== null && x !== undefined); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; }
+function mediaMeses(i0, i1) {
+  const ms = []; for (let i = i0; i <= i1; i++) ms.push(DATA.periodos[`M${i + 1}`]);
+  const rodape = {}; Object.keys(ms[0].rodape).forEach((k) => { rodape[k] = avg(ms.map((m) => m.rodape[k])); });
+  const complexidade = {}; new Set(ms.flatMap((m) => Object.keys(m.complexidade))).forEach((k) => { complexidade[k] = avg(ms.map((m) => m.complexidade[k] || 0)); });
+  const rows = ms[0].rows.map((r, j) => r.map((v, c) => c === IDX['_k'] ? v : avg(ms.map((m) => m.rows[j][c]))));
+  return { tipo: 'Mensal', rotulo: `${MESES[i0]} a ${MESES[i1]} · média dos meses`, n_meses: ms.length, rodape, complexidade, rows };
 }
 function rowsOf(p) {
   return p.rows.map((vals) => { const o = {}; COLS.forEach((c, i) => { o[c] = vals[i]; }); const k = DATA.linhas[vals[IDX['_k']]]; o.PROCESSO = k[0]; o.FAMILIA = k[1]; o.CLUSTER = k[2]; o.Categoria = k[3]; return o; });
@@ -503,7 +513,7 @@ function renderKpis(p) {
     </div>
     <div class="card kgroup"><h3>Fluxo de lotes</h3>
       ${kpi(sem ? 'Lotes da semana (com TC)' : (p.n_meses > 1 ? 'Lotes por mês (média)' : 'Lotes do mês'), fmt(r.total_lotes, sem ? 0 : 0), sem ? 'Status2 = "Tempos OK"' : 'demanda total CQ P30')}
-      ${kpi(sem ? 'Dias úteis da semana' : 'Dias úteis no mês', fmt(r.dias_uteis), sem ? 'calendário semanal' : 'constante 22,97 do arquivo')}
+      ${kpi(sem ? 'Dias úteis da semana' : 'Dias úteis no mês', fmt(r.dias_uteis), sem ? 'calendário da semana' : (p.n_meses > 1 ? 'média dos meses (calendário)' : 'calendário do mês'))}
       ${kpi('Lotes por dia', fmt(r.lotes_dia, 1), 'lotes ÷ dias úteis')}
       ${kpi('Lotes por dia a 100%', fmt(r.lotes_dia_100, 1), 'lotes por dia ÷ % ocupação corrigida', 'hero')}
     </div>`;
@@ -587,8 +597,8 @@ function render() {
   const p = periodo();
   $('#perLabel').textContent = p.rotulo;
   $('#perBasis').textContent = p.tipo === 'Semanal'
-    ? 'Demanda: lotes em quarentena da semana (SharePoint). Horas: calendário semanal. Indicadores: mesmas fórmulas do rodapé da CAP.'
-    : `Demanda: ${p.n_meses > 1 ? 'média mensal dos lotes do intervalo' : 'lotes do mês'} (aba DEMANDA). Horas: média mensal do calendário. Indicadores calculados com a CAP deste período.`;
+    ? 'Demanda: lotes em quarentena da semana (SharePoint). Horas e dias úteis: calendário da semana. Indicadores: mesmas fórmulas do rodapé da CAP.'
+    : (p.n_meses > 1 ? `Intervalo: cada número (CAP, indicadores e complexidade) é a média simples dos ${p.n_meses} meses.` : 'Demanda: lotes do mês (aba DEMANDA). Horas e dias úteis: calendário do mês. Indicadores com a CAP deste mês.');
   renderKpis(p);
   const all = rowsOf(p);
   const rows = all.filter((r) => (!state.cat || r.Categoria === state.cat) && (!state.st || status(r.CARREGAMENTO) === state.st));
@@ -602,9 +612,11 @@ function renderDocs() {
   $('#decisoes').innerHTML = DATA.decisoes.map((d) => `<li>${d}</li>`).join('');
   const v = DATA.validacao;
   $('#valKpis').innerHTML = `<div class="card kgroup"><h3>CAP · Semana 45</h3>${kpi('Linhas', fmt(v.linhas, 0), 'iguais nas duas versões')}${kpi('Valores comparados', fmt(v.valores, 0), 'linhas × 14 colunas')}${kpi('Diferenças', fmt(v.diferencas, 0), 'tolerância 1e-9', 'hero')}</div>
-    <div class="card kgroup"><h3>Indicadores</h3>${kpi('Conferidos', fmt(v.checks.length, 0), 'rodapé, setembro e complexidade')}${kpi('Diferenças', fmt(v.checks.filter((c) => !c.ok).length, 0), 'tolerância 1e-9', 'hero')}</div>`;
+    <div class="card kgroup"><h3>Indicadores</h3>${kpi('Conferidos', fmt(v.checks.length, 0), 'rodapé, setembro e complexidade')}${kpi('Diferenças', fmt(v.checks.filter((c) => !c.ok).length, 0), 'tolerância 1e-9', 'hero')}</div>
+    <div class="card kgroup"><h3>Fórmulas da aba PAINEL (Excel)</h3>${kpi('Valores testados', fmt(v.excel.valores, 0), v.excel.casos)}${kpi('Diferenças', fmt(v.excel.falhas, 0), 'recalculado no LibreOffice x motor Python', 'hero')}</div>`;
+  $('#mudancas').innerHTML = DATA.mudancas.map((m) => `<li>${m}</li>`).join('');
   $('#tblVal tbody').innerHTML = v.checks.map((c) => `<tr><td>${esc(c.nome)}</td><td class="n">${fmt(c.arq, 4)}</td><td class="n">${fmt(c.calc, 4)}</td><td>${c.ok ? '<span class="pill ok"><span class="dot"></span>igual</span>' : '<span class="pill bad"><span class="dot"></span>diferente</span>'}</td></tr>`).join('');
-  const set = rowsOf(DATA.periodos['M9-9']).filter((r) => r.Categoria === 'Mão de Obra');
+  const set = rowsOf(DATA.periodos['M9']).filter((r) => r.Categoria === 'Mão de Obra');
   $('#tblSet tbody').innerHTML = set.map((r) => `<tr><td>${esc(r.FAMILIA)}</td><td class="n">${fmt(r['CM (HRS)'])}</td><td class="n">${fmt(r['HC NECESSARIO'])}</td><td class="n">${pct(r.CARREGAMENTO, 2)}</td><td class="n">${fmt(r['Soma Demanda Media'])}</td></tr>`).join('');
 }
 

@@ -353,7 +353,17 @@ def tc_com_campanha(t, periodo, dem=None, detalhe=False):
 
 
 # ─────────────────────────────── CAP_PROPOSTA ───────────────────────────
-def cap_proposta(t, periodo, fam_rows=None, dem=None, linhas=None):
+def dias_uteis(t, periodo):
+    """Dias úteis do período no calendário: semana escolhida ou média dos meses ativos."""
+    if periodo.nivel == "Semanal":
+        cal = [r for r in records(t['CALENDARIO_SEMANA']) if r['Semana Chave'] == periodo.semana_chave]
+    else:
+        cal = [r for r in records(t['CALENDARIO_MES']) if MESES[int(r['Mês Nº']) - 1] in periodo.meses_ativos]
+    return sum(to_num(r['Dias Úteis']) for r in cal) / len(cal)
+
+
+def cap_proposta(t, periodo, fam_rows=None, dem=None, linhas=None, dias_fifo=22.97):
+    """dias_fifo: 22.97 reproduz o arquivo original; a versão nova usa dias_uteis(t, periodo)."""
     dem = dem if dem is not None else demanda_mpr(t, periodo)
     linhas = linhas if linhas is not None else tc_com_campanha(t, periodo, dem)
     fam_rows = fam_rows if fam_rows is not None else tabela_fam(t, periodo)
@@ -452,7 +462,7 @@ def cap_proposta(t, periodo, fam_rows=None, dem=None, linhas=None):
         r['DEM'] = v if v is not None else 0
         r['TAKT'] = r['TOT'] / r['DEM'] if r['DEM'] else None
         r['TC_MEDIO'] = r['CM_HRS'] / r['DEM'] if r['DEM'] else None
-        r['FIFO'] = r['TOT'] / r['TAKT'] / 22.97 if r['TAKT'] else None
+        r['FIFO'] = r['TOT'] / r['TAKT'] / dias_fifo if r['TAKT'] else None
 
     out = []
     for r in rows:

@@ -1,62 +1,56 @@
-"""Monta o painel HTML com os dados recalculados (e conferidos) a partir do arquivo."""
-import json, pickle, sys, io, contextlib
-sys.path.insert(0, sys.argv[4] if len(sys.argv) > 4 else '.')
-from cap_engine import Periodo, cap_proposta, records, MESES
+"""Monta o painel HTML (protótipo) com os dados das regras novas, conferidos contra o arquivo.
+
+Uso: python3 build_painel.py tabelas.pkl painel_template.html saida.html teste_excel.json
+"""
+import json, pickle, sys
+from cap_engine import records
 import painel_data as PD
 
-t = pickle.load(open(sys.argv[1], 'rb'))
-template = open(sys.argv[2], encoding='utf-8').read()
-OUT = sys.argv[3]
+TAB, TPL, OUT, TESTE = sys.argv[1:5]
+t = pickle.load(open(TAB, 'rb'))
+template = open(TPL, encoding='utf-8').read()
+teste_excel = json.load(open(TESTE))
 
-# ── períodos ──
-sem = PD.periodo_semana(t, 202645.0)
-per = [sem] + [PD.periodo_meses(t, i0, i1) for i0 in range(12) for i1 in range(i0, 12)]
+# ── base: a réplica (regras antigas) tem de bater com o arquivo ──
+semana_arquivo = PD.semana(t, 202645.0, dias_fifo=22.97)
+saved = records(t['CAP_PROPOSTA'])
+calc = {(r['PROCESSO'], r['FAMILIA']): r for r in semana_arquivo['cap']}
+vcols = ['CLUSTER', 'Categoria', 'CM (HRS)', 'RECURSO MÉDIO ATUAL', 'TOTAL RECURSO', 'HRS TURNO', 'OEE REAL',
+         'OEE NEC', 'HC NECESSARIO', 'CARREGAMENTO', 'Soma Demanda Media', 'TAKT', 'TC MEDIO', 'FIFO']
+dif = 0
+for s in saved:
+    c = calc[(s['PROCESSO'], s['FAMILIA'])]
+    for col in vcols:
+        a, b = s[col], c[col]
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            dif += abs(a - b) > 1e-9 * max(1, abs(a))
+        else:
+            dif += not (a == b or (a in (None, '') and b in (None, '')))
+checks = PD.conferencias(t)
+assert len(saved) == len(calc) and dif == 0 and all(c['ok'] for c in checks), 'réplica não bate com o arquivo'
+assert teste_excel['falhas'] == 0, 'fórmulas do PAINEL não bateram no teste'
 
+# ── períodos com as regras novas ──
+per = [PD.semana(t, 202645.0)] + [PD.mes(t, i) for i in range(12)]
 COLS = ['_k', 'CM (HRS)', 'RECURSO MÉDIO ATUAL', 'TOTAL RECURSO', 'HRS TURNO', 'OEE REAL', 'OEE NEC',
         'HC NECESSARIO', 'CARREGAMENTO', 'Soma Demanda Media', 'TAKT', 'TC MEDIO', 'FIFO']
-linhas, lidx = [], {}
-periodos = {}
+linhas, lidx, periodos = [], {}, {}
 for p in per:
     rows = []
     for r in p['cap']:
         k = (r['PROCESSO'], r['FAMILIA'], r['CLUSTER'], r['Categoria'])
         if k not in lidx:
             lidx[k] = len(linhas); linhas.append(list(k))
-        rows.append([lidx[k]] + [None if r[c] is None else (round(r[c], 12) if isinstance(r[c], float) else r[c]) for c in COLS[1:]])
-    n = 1 if p['tipo'] == 'Semanal' else int(p['id'][1:].split('-')[1]) - int(p['id'][1:].split('-')[0]) + 1
-    periodos[p['id']] = dict(tipo=p['tipo'], rotulo=p['rotulo'], n_meses=n, rodape=p['rodape'],
+        rows.append([lidx[k]] + [r[c] for c in COLS[1:]])
+    rows.sort(key=lambda x: x[0])   # mesma ordem em todos os períodos (a média de intervalo usa a posição)
+    periodos[p['id']] = dict(tipo=p['tipo'], rotulo=p['rotulo'], n_meses=1, rodape=p['rodape'],
                              complexidade=p['complexidade'], rows=rows)
+assert len({tuple(x[0] for x in p['rows']) for p in periodos.values()}) == 1
 
-# ── validação (CAP semana 45 célula a célula + indicadores) ──
-saved = records(t['CAP_PROPOSTA'])
-calc = {(r['PROCESSO'], r['FAMILIA']): r for r in sem['cap']}
-vcols = ['CLUSTER', 'Categoria', 'CM (HRS)', 'RECURSO MÉDIO ATUAL', 'TOTAL RECURSO', 'HRS TURNO', 'OEE REAL',
-         'OEE NEC', 'HC NECESSARIO', 'CARREGAMENTO', 'Soma Demanda Media', 'TAKT', 'TC MEDIO', 'FIFO']
-dif = 0
-for s in saved:
-    c = calc.get((s['PROCESSO'], s['FAMILIA']))
-    for col in vcols:
-        a, b = s[col], c[col] if c else None
-        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-            dif += abs(a - b) > 1e-9 * max(1, abs(a))
-        else:
-            dif += not (a == b or (a in (None, '') and b in (None, '')))
-assert len(saved) == len(calc) and dif == 0, 'CAP semana 45 não bate com o arquivo'
-
-buf = io.StringIO()
-with contextlib.redirect_stdout(buf):
-    sys.argv = ['painel_data.py', sys.argv[1], '/dev/null']
-    exec(compile(open('painel_data.py').read().split("if __name__ == '__main__':")[1].replace('\n    ', '\n'), 'pd', 'exec'),
-         dict(PD.__dict__, t=t))
-checks = []
-for line in buf.getvalue().splitlines():
-    if line.startswith(('OK ', 'FALHA ')):
-        ok = line.startswith('OK')
-        nome = line[5:].split(' arquivo=')[0].strip()
-        arq = float(line.split('arquivo=')[1].split()[0])
-        calc_v = float(line.split('recalculado=')[1])
-        checks.append(dict(nome=nome, arq=arq, calc=calc_v, ok=ok))
-assert checks and all(c['ok'] for c in checks)
+s45, s45a = per[0], semana_arquivo
+fifo_dis = [r['FIFO'] for r in s45['cap'] if r['FAMILIA'] == 'Fam Dissolutor'][0]
+fifo_dis_a = [r['FIFO'] for r in s45a['cap'] if r['FAMILIA'] == 'Fam Dissolutor'][0]
+setv = periodos['M9']['rodape']
 
 exemplo = """8 lotes na semana · campanha de 4,22 lotes → ARRED.PARA.CIMA = 5 lotes/campanha → nCamp = ARRED.PARA.CIMA(8 ÷ 5) = 2
 
@@ -72,43 +66,54 @@ Etapa 14 · processamento  30 min               →  30 × 8                    
 HPLC CRLQ0043: padrão 6 inj × 10 min = 60 · amostra 10 inj × 10 min = 100
    por lote = (2 × 60 + 6 × 60 × 10%) ÷ 8 + 100 = 119,5 min  × 8 lotes             =   956 min  → linha CRLQ0043"""
 
+def n2(v, d=2):
+    return f'{v:,.{d}f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+
 achados = [
-    dict(nivel='bad', tag='Rodapé', titulo='O rodapé depende do filtro manual da tabela',
-         det='HC por turno real e HC necessário usam SUBTOTAL, que soma só as linhas visíveis. Hoje a tabela está filtrada em Categoria = Mão de Obra (50,98). Sem o filtro, o mesmo campo vira 92,98 e a ocupação muda sem aviso.'),
-    dict(nivel='bad', tag='Rodapé', titulo='O bloco "Mês Setembro" mistura semana e mês',
-         det='Ele usa os lotes de setembro (1.691) com o HC necessário da CAP que estiver carregada (hoje, a da semana 45: 59,48). Por isso mostra 117,79% de ocupação corrigida. Com a CAP de setembro de fato, o HC necessário por turno é 48,68 e a ocupação corrigida fica em 96,4%.'),
-    dict(nivel='warn', tag='Rodapé', titulo='Números digitados que precisam ser trocados a cada período',
-         det='"Semana 45", 4,58 dias úteis (copiado do calendário), "Mês Setembro", 22,97 dias úteis no mês, as referências DEMANDA!P1459/P1460 (coluna de setembro) e o "× 3" turnos. O 22,97 também está fixo no FIFO da consulta e não bate com o calendário (setembro tem 25 dias úteis; a média semanal × 52 ÷ 12 dá 23,28).'),
-    dict(nivel='warn', tag='Rodapé', titulo='Critérios de lotes diferentes entre semana e mês',
-         det='Na semana, "Total lotes" conta só os lotes com TC (414 de 416). No mês, conta a demanda total (1.691, inclusive lotes sem TC). A correção pelo % de lotes com TC é aplicada nos dois casos.'),
-    dict(nivel='warn', tag='CAP', titulo='Categoria é digitada dentro da tabela da consulta',
-         det='A coluna não vem do Power Query. Se uma atualização mudar a quantidade ou a ordem das linhas, a categoria pode ficar desalinhada e o rodapé soma linhas erradas. Hoje está correta (conferi contra Tabela_FAM[CATEGORIA]).'),
-    dict(nivel='warn', tag='CAP', titulo='Horas calculadas que não aparecem em nenhuma linha',
-         det='Espectro (AA, ICP, IV, UV) gera "MO EQUIPAMENTO BANCADA", mas essa família tem recurso 0 na Tabela_FAM e a linha é descartada: 68,75 h na semana 45, 392 h em setembro. O cromatógrafo CRGS0043 não está na Tabela_FAM: 25,75 h na semana e 214 h em setembro somem da CAP.'),
-    dict(nivel='info', tag='CAP', titulo='HRS TURNO é arredondado só no HC necessário',
-         det='A consulta FAM_PROPOSTA converte HRS TURNO para inteiro (104,22 → 104). TOTAL RECURSO usa 104,22 e HC NECESSARIO usa 104, uma diferença de ~0,2% entre as duas colunas.'),
-    dict(nivel='info', tag='CAP', titulo='FIFO usa a constante mensal também na semana',
-         det='FIFO = TOTAL RECURSO ÷ TAKT ÷ 22,97, que é o mesmo que demanda ÷ 22,97. Na visão semanal a demanda é da semana, então o número não representa lotes por dia.'),
-    dict(nivel='info', tag='Semanal', titulo='A visão semanal só enxerga a semana que está no SharePoint',
-         det='A Tabela_DemandaSemanal tem hoje apenas a chave 202645. Escolher outra semana no filtro devolve uma CAP vazia, a menos que a base do SharePoint tenha aquela semana.'),
+    dict(nivel='ok', tag='Resolvido no PAINEL', titulo='O rodapé dependia do filtro manual da tabela',
+         det='HC por turno real e HC necessário usavam SUBTOTAL (só linhas visíveis). No PAINEL, a soma é por Categoria = Mão de Obra, independente de filtro.'),
+    dict(nivel='ok', tag='Resolvido no PAINEL', titulo='O bloco "Mês Setembro" misturava semana e mês',
+         det=f'Usava os lotes de setembro com o HC da CAP da semana 45 (117,79%). Agora cada mês usa a própria CAP: setembro tem HC necessário por turno de {n2(setv["hc_turno_nec"])} e ocupação corrigida de {n2(setv["ocupacao_corr"] * 100, 1)}%. Intervalo de meses = média dos meses.'),
+    dict(nivel='ok', tag='Resolvido no PAINEL', titulo='Números digitados a cada período',
+         det=f'"Semana 45", 4,58, "Mês Setembro", 22,97 e as referências à coluna de setembro saíram. Dias úteis vêm do calendário: semana 45 = 4,58; setembro = 25. Com isso, lotes/dia de setembro passa de 73,6 para {n2(setv["lotes_dia"], 1)}.'),
+    dict(nivel='ok', tag='Resolvido no PAINEL', titulo='FIFO usava a constante mensal também na semana',
+         det=f'FIFO agora é demanda ÷ dias úteis do período. Fam Dissolutor na semana 45: {n2(fifo_dis_a)} → {n2(fifo_dis)}.'),
+    dict(nivel='ok', tag='Resolvido no PAINEL', titulo='Categoria era digitada dentro da tabela da consulta',
+         det='Na consulta nova, a Categoria vem da Tabela_FAM. Conferido: igual às 55 linhas atuais.'),
+    dict(nivel='info', tag='Mantido (decisão)', titulo='Horas calculadas que não aparecem em nenhuma linha',
+         det='Espectro (68,75 h na semana 45; 392 h em setembro) e CRGS0043 (25,75 h; 214 h) seguem fora da CAP porque não há recurso cadastrado para eles.'),
+    dict(nivel='info', tag='Mantido (decisão)', titulo='HRS TURNO arredondado só no HC necessário',
+         det='TOTAL RECURSO usa 104,22 h e HC NECESSARIO usa 104 h (diferença de ~0,2%).'),
+    dict(nivel='warn', tag='Atenção', titulo='Critérios de lotes diferentes entre semana e mês',
+         det='Na semana, "Lotes no período" conta só os lotes com TC (414 de 416). No mês, conta a demanda total CQ P30 (1.691). Mantido como no arquivo.'),
+    dict(nivel='info', tag='Semanal', titulo='A visão semanal só enxerga as semanas que estão no SharePoint',
+         det='A base de quarentena traz hoje só a semana 202645. Para semanas passadas é preciso guardar um retrato por semana.'),
     dict(nivel='info', tag='Arquivo', titulo='A versão de 25/09 ficou com a CAP desatualizada',
-         det='A CAP salva não corresponde às bases do próprio arquivo (recursos e horas diferentes da aba FAMÍLIAS). Isso acontece quando uma base é editada e o "Atualizar Tudo" não é rodado; o desenho atual depende disso a cada troca de filtro.'),
+         det='A CAP salva não corresponde às bases do próprio arquivo. No PAINEL novo, trocar o período não exige atualizar consultas, o que reduz esse risco.'),
     dict(nivel='info', tag='Arquivo', titulo='Cálculo paralelo pesado na BASE TC',
-         det='~194 mil fórmulas com DESLOC (colunas CB a DM) refazem campanha e TC × demanda por fórmula, com divisores fixos (÷12, ÷5, ÷6). Não alimentam a CAP, deixam o arquivo lento e dão resultados diferentes dela.'),
+         det='~194 mil fórmulas com DESLOC (colunas CB a DM) refazem campanha e TC × demanda por fórmula, com divisores fixos (÷12, ÷5, ÷6). Não alimentam a CAP e deixam o arquivo lento.'),
 ]
 decisoes = [
-    'O bloco mensal do rodapé deve usar o HC da CAP do mesmo mês (96,4% em setembro) ou continuar comparando com a CAP carregada (117,79%)?',
-    'Dias úteis no mês: manter 22,97 fixo ou usar o calendário de cada mês (ex.: setembro = 25)? Afeta lotes/dia e o FIFO.',
-    'Espectro e CRGS0043: cadastrar recurso na Tabela_FAM para que essas horas entrem na CAP?',
-    'HRS TURNO: manter o arredondamento para inteiro no HC necessário ou usar o valor exato?',
-    'Os 3 turnos do "× 3" valem para todas as famílias de mão de obra?',
+    'Mês filtrado: CAP e indicadores daquele mês. Intervalo filtrado: média simples dos meses do intervalo.',
+    'Dias úteis: calendário de cada mês e de cada semana (aba FAMÍLIAS). Vale para lotes/dia e FIFO.',
+    'Espectro e CRGS0043: ficam como estão (sem recurso cadastrado).',
+    'HRS TURNO: mantém o arredondamento para inteiro no HC necessário.',
+    '× 3 turnos para todas as famílias de mão de obra.',
+]
+mudancas = [
+    f'FIFO de todas as linhas: demanda ÷ dias úteis do período (antes ÷ 22,97). Ex.: Fam Dissolutor na semana 45, {n2(fifo_dis_a)} → {n2(fifo_dis)}.',
+    'Categoria passa a vir da consulta; os valores são os mesmos de hoje.',
+    'Visão mensal: cada mês usa a própria CAP e o próprio calendário; o bloco "Mês Setembro" do arquivo (117,79%) dá lugar ao setembro calculado de fato '
+    f'({n2(setv["ocupacao_corr"] * 100, 1)}% de ocupação corrigida, {n2(setv["lotes_dia"], 1)} lotes/dia).',
+    'Intervalo de meses: média simples dos meses (antes a consulta calculava um "mês médio").',
+    'Todo o resto da semana 45 (CM, HC, carregamento, demanda, TAKT, TC médio e o rodapé) segue idêntico ao arquivo.',
 ]
 
 data = dict(cols=COLS, linhas=linhas, periodos=periodos,
-            semanas=[dict(id=sem['id'], rotulo=sem['rotulo'])],
-            exemplo=exemplo, achados=achados, decisoes=decisoes,
-            validacao=dict(linhas=len(saved), valores=len(saved) * len(vcols), diferencas=dif, checks=checks))
-js = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
-out = template.replace('/*__DATA__*/null', js)
+            semanas=[dict(id=per[0]['id'], rotulo=per[0]['rotulo'])],
+            exemplo=exemplo, achados=achados, decisoes=decisoes, mudancas=mudancas,
+            validacao=dict(linhas=len(saved), valores=len(saved) * len(vcols), diferencas=dif,
+                           checks=checks, excel=teste_excel))
+out = template.replace('/*__DATA__*/null', json.dumps(data, ensure_ascii=False, separators=(',', ':')))
 open(OUT, 'w', encoding='utf-8').write(out)
-print('ok', len(out) // 1024, 'KB', len(periodos), 'períodos', len(linhas), 'linhas distintas', len(checks), 'checks')
+print('ok', len(out) // 1024, 'KB')
