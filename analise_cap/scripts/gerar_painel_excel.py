@@ -159,7 +159,16 @@ def spec():
         add(f'R{r}', f'=IF(M{r}="","",IF(M{r}>1,"Sobrecarregado",IF(M{r}>=0.8,"Adequado","Sub-utilizado")))')
         for col, nome, src in (('S', 'CM (HRS)', 'F'), ('T', 'HC NECESSARIO', 'L'), ('U', 'CARREGAMENTO', 'M')):
             add(f'{col}{r}', f'=IF($C{r}="","",IFERROR({src}{r}-SUMIFS(CAP_PROPOSTA[{nome}],CAP_PROPOSTA[PROCESSO],$B{r},CAP_PROPOSTA[FAMILIA],$C{r}),""))', '0.0000')
-    return c
+    # formatos do quadro mês a mês
+    fmts = {col: fmt for col, _, fmt in QUADRO}
+    linhas_q = set(range(R_MES0, R_MES0 + 12)) | {R_SEM}
+    out = []
+    for ref, v, fmt in c:
+        col, row = ''.join(ch for ch in ref if ch.isalpha()), int(''.join(ch for ch in ref if ch.isdigit()))
+        if fmt is None and row in linhas_q and col in fmts and col != 'B':
+            fmt = fmts[col]
+        out.append((ref, v, fmt))
+    return out
 
 
 # ───────────────────────────── VBA ─────────────────────────────

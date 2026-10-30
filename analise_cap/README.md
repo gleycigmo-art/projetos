@@ -5,6 +5,7 @@ Material de apoio para entender e simplificar o arquivo `MFV_CQPA_2026_Oficial. 
 | Arquivo | Conteúdo |
 |---|---|
 | `painel_cap.html` | Protótipo do painel: filtro Semanal/Mensal, indicadores do rodapé em cartões, complexidade, CAP com status de carregamento, racional do cálculo, achados, sugestões e validação. Abre direto no navegador. |
+| `PAINEL_CAP_previa.xlsx` | **Excel de prévia**: a aba PAINEL funcionando com os dados de 30/10 (retrato, não atualiza). Para ver e testar os filtros já. |
 | `excel_kit/` | **Kit para o Excel**: macro + consultas novas que criam a aba PAINEL com filtro instantâneo. Ver `excel_kit/LEIA-ME.md`. |
 | `consultas_power_query.m` | As 13 consultas Power Query extraídas do arquivo (texto original, sem alteração). |
 | `scripts/cap_engine.py` | Réplica em Python das consultas `FILTRO_PERIODO → DEMANDA_MPR → BASE_TC_CAMP → TC_COM_CAMPANHA → CAP_PROPOSTA` e da fórmula de HRS TURNO da `Tabela_FAM`. |
@@ -14,6 +15,7 @@ Material de apoio para entender e simplificar o arquivo `MFV_CQPA_2026_Oficial. 
 | `scripts/build_painel.py` | Monta o `painel_cap.html` a partir do template. |
 | `scripts/gerar_consultas_v2.py` | Gera as consultas do kit a partir do texto original das consultas (troca exata de trechos, conferida). |
 | `scripts/gerar_painel_excel.py` | Define a aba PAINEL num lugar só e gera a macro e os arquivos de teste. |
+| `scripts/gerar_previa_excel.py` | Gera o Excel de prévia com as mesmas fórmulas do kit. |
 | `scripts/testar_painel_excel.py` | Compara a aba PAINEL recalculada no LibreOffice com o motor Python. |
 
 ## Resultado da validação (arquivo de 30/10, semana 45)
