@@ -1,0 +1,69 @@
+<title>FLOW LAB</title>
+<meta name="description" content="Capacidade semanal e mensal do laboratório de CQ: carregamento por família, gargalos, mão de obra e simulação.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+/*__CSS__*/
+</style>
+
+<div class="shell" id="shell">
+  <aside class="sidebar" id="sidebar" aria-label="Navegação">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">FL</div>
+      <div><div class="brand-name">FLOW LAB</div><div class="brand-sub">QUALIDADE · CAPACIDADE</div></div>
+    </div>
+    <button class="btn btn-ghost sidebar-close" id="nav-close" aria-label="Fechar menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-foot">
+      <div class="micro">Última importação</div>
+      <div class="val" id="last-import">—</div>
+    </div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn-ghost menu-btn" id="nav-open" aria-label="Abrir menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="title">
+        <div class="micro" id="area-label">Painel executivo</div>
+        <h1 id="period-title">—</h1>
+      </div>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Nível de visão">
+          <button type="button" data-nivel="Semanal" aria-pressed="true">Semana</button>
+          <button type="button" data-nivel="Mensal" aria-pressed="false">Mês</button>
+        </div>
+        <label class="sr-only" for="period-select">Período</label>
+        <select id="period-select"></select>
+        <button class="btn" id="btn-export" type="button" aria-label="Exportar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>
+          <span class="txt">Exportar</span>
+        </button>
+        <button class="btn btn-primary" id="btn-sim" type="button" aria-label="Simular">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+          <span class="txt">Simular</span>
+        </button>
+      </div>
+    </header>
+
+    <section class="signal" id="signal" aria-live="polite"></section>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script id="dados-embutidos" type="application/json">/*__DADOS__*/</script>
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+/*__IMPORT__*/
+</script>
+<script>
+/*__APP__*/
+</script>

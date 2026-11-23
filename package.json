@@ -1,0 +1,8 @@
+{
+  "name": "flow-lab",
+  "private": true,
+  "scripts": {
+    "build": "python3 app/build.py",
+    "test": "node --test app/test/*.test.mjs"
+  }
+}

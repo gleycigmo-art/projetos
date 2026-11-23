@@ -1,0 +1,132 @@
+card_carregamento_familias =
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- FLOW LAB · carregamento por família (barras), maior para o menor
+-- Troque a variável "categoria" para "Equipamento" e duplique a medida para
+-- ter o card dos equipamentos (HPLC/CG e dissolutor).
+-- ═══════════════════════════════════════════════════════════════════════════
+
+var categoria =
+"Mão de Obra"          -- "Mão de Obra" ou "Equipamento"
+
+var qtd_familias =
+8                      -- quantas famílias mostrar
+
+var periodo_ok =
+HASONEVALUE(dPeriodo[Periodo_ID])
+
+var rotulo =
+SELECTEDVALUE(dPeriodo[Rotulo])
+
+-- ── simulação: sem seleção no segmentador = valores reais ─────────────────
+var fator_demanda =
+SELECTEDVALUE('Sim Demanda'[Fator Demanda], 1)
+
+var oee_mo_sim =
+SELECTEDVALUE('Sim OEE MO'[OEE MO], BLANK())
+
+var fator_oee_equip =
+SELECTEDVALUE('Sim OEE Equip'[Fator OEE Equip], 1)
+
+-- ── carregamento = HC necessário ÷ recurso atual ─────────────────────────
+var linhas =
+ADDCOLUMNS(
+    ADDCOLUMNS(
+        FILTER(fCap, fCap[CATEGORIA] = categoria),
+        "@oee",
+        IF(
+            fCap[CATEGORIA] = "Mão de Obra",
+            IF(ISBLANK(oee_mo_sim), fCap[OEE], oee_mo_sim),
+            fCap[OEE] * fator_oee_equip
+        ),
+        "@cm", fCap[CM_HRS] * fator_demanda
+    ),
+    "@carreg", DIVIDE([@cm], fCap[HRS_TURNO] * [@oee] * fCap[RECURSO]),
+    "@gap", DIVIDE([@cm], fCap[HRS_TURNO] * [@oee]) - fCap[RECURSO]
+)
+
+var escala =
+MAX(1.2, MAXX(linhas, [@carreg]))
+
+var marca_100 =
+FORMAT(DIVIDE(1, escala) * 100, "0.0", "en-US")      -- CSS usa ponto decimal
+
+var total_familias =
+COUNTROWS(linhas)
+
+var acima_100 =
+COUNTROWS(FILTER(linhas, [@carreg] > 1))
+
+var fonte_mono =
+"font-family:Consolas,'Cascadia Mono','Courier New',monospace;"
+
+var estilo_micro =
+fonte_mono & "font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#929DA6;"
+
+var barras =
+CONCATENATEX(
+    TOPN(qtd_familias, linhas, [@carreg], DESC),
+    var c = [@carreg]
+    var cor =
+        SWITCH(TRUE(), c > 1, "#E5564A", c >= 0.8, "#DEA132", "#47B777")
+    var largura =
+        FORMAT(MIN(DIVIDE(c, escala), 1) * 100, "0.0", "en-US")
+    var nome =
+        SUBSTITUTE(SUBSTITUTE(fCap[FAMILIA], "&", "&amp;"), "<", "&lt;")
+    var detalhe =
+        FORMAT([@cm], "#,##0", "pt-BR") & " h · " &
+        IF(categoria = "Mão de Obra",
+           "gap " & IF([@gap] > 0, "+", "") & FORMAT([@gap], "0.0", "pt-BR") & " HC · ",
+           "OEE " & FORMAT([@oee], "0%", "pt-BR") & " · ")
+    return
+    "
+    <div style='margin-bottom:10px;'>
+        <div style='display:flex;justify-content:space-between;gap:10px;margin-bottom:4px;'>
+            <span style='font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" & nome & "</span>
+            <span style='" & fonte_mono & "font-size:11px;color:#929DA6;white-space:nowrap;'>" & detalhe & "<b style='color:#E3E9ED;'>" & FORMAT(c, "0.0%", "pt-BR") & "</b></span>
+        </div>
+        <div style='position:relative;height:8px;border-radius:4px;background:#090E12;'>
+            <div style='position:absolute;left:0;top:0;bottom:0;width:" & largura & "%;border-radius:4px;background:" & cor & ";'></div>
+            <div style='position:absolute;top:-3px;bottom:-3px;left:" & marca_100 & "%;border-left:1px dashed #929DA6;'></div>
+        </div>
+    </div>
+    ",
+    "",
+    [@carreg], DESC
+)
+
+Return
+
+IF(
+    NOT periodo_ok,
+    "<div style='width:100%;height:100vh;box-sizing:border-box;padding:16px;background:#060A0E;color:#929DA6;font-family:Segoe UI;font-size:13px;'>Selecione um único período (semana ou mês).</div>",
+
+"
+<div style='
+    width:100%;
+    height:100vh;
+    box-sizing:border-box;
+    padding:14px 16px;
+    background:#0D1217;
+    border:1px solid #20272D;
+    border-radius:8px;
+    color:#E3E9ED;
+    font-family:Segoe UI, sans-serif;
+    overflow:auto;
+'>
+    <div style='display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:12px;'>
+        <div>
+            <div style='font-size:14px;font-weight:600;'>Carregamento por família · " & IF(categoria = "Mão de Obra", "mão de obra", "equipamentos") & "</div>
+            <div style='" & estilo_micro & "margin-top:3px;'>" & rotulo & " · " & FORMAT(acima_100, "0") & " de " & FORMAT(total_familias, "0") & " acima de 100%</div>
+        </div>
+        <div style='display:flex;gap:10px;" & fonte_mono & "font-size:10px;color:#929DA6;'>
+            <span><span style='display:inline-block;width:8px;height:8px;border-radius:50%;background:#E5564A;'></span> &gt;100%</span>
+            <span><span style='display:inline-block;width:8px;height:8px;border-radius:50%;background:#DEA132;'></span> 80–100%</span>
+            <span><span style='display:inline-block;width:8px;height:8px;border-radius:50%;background:#47B777;'></span> &lt;80%</span>
+        </div>
+    </div>
+    " & barras & "
+    <div style='" & estilo_micro & "margin-top:4px;'>Linha tracejada = 100% · carregamento = HC necessário ÷ recurso atual</div>
+</div>
+"
+)

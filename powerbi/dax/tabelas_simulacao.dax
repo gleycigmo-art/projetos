@@ -1,0 +1,17 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Tabelas de simulação (Modelagem > Nova tabela). Cada uma vira um segmentador de
+-- seleção única. Sem nada selecionado, os cards usam os valores reais.
+-- Não precisam de relacionamento com as outras tabelas.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+Sim OEE MO =
+SELECTCOLUMNS(GENERATESERIES(0.40, 1.00, 0.01), "OEE MO", ROUND([Value], 2))
+
+Sim OEE Equip =
+SELECTCOLUMNS(GENERATESERIES(0.50, 1.50, 0.05), "Fator OEE Equip", ROUND([Value], 2))
+
+Sim Demanda =
+SELECTCOLUMNS(GENERATESERIES(0.50, 1.50, 0.05), "Fator Demanda", ROUND([Value], 2))
+
+Sim Ausencias =
+SELECTCOLUMNS(GENERATESERIES(-20, 40, 1), "Ausencias Extra", [Value])

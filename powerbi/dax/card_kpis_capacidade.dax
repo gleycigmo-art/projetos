@@ -1,0 +1,332 @@
+card_kpis_capacidade =
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- FLOW LAB · semáforo + 8 indicadores de capacidade do período selecionado
+-- Tabelas: dPeriodo, fCap, fDemanda, dRecurso, fAusencias (Power Query)
+-- Simulação (opcional): tabelas 'Sim OEE MO', 'Sim Demanda', 'Sim Ausencias'
+-- Visual: HTML Content
+-- ═══════════════════════════════════════════════════════════════════════════
+
+var periodo_ok =
+HASONEVALUE(dPeriodo[Periodo_ID])
+
+var rotulo =
+SELECTEDVALUE(dPeriodo[Rotulo])
+
+var nivel =
+SELECTEDVALUE(dPeriodo[Nivel])
+
+var numero =
+SELECTEDVALUE(dPeriodo[Numero])
+
+var fonte =
+SELECTEDVALUE(dPeriodo[Fonte])
+
+var dias_uteis =
+SELECTEDVALUE(dPeriodo[DiasUteis])
+
+-- ── simulação: sem seleção no segmentador = valores reais ─────────────────
+var fator_demanda =
+SELECTEDVALUE('Sim Demanda'[Fator Demanda], 1)
+
+var oee_mo_sim =
+SELECTEDVALUE('Sim OEE MO'[OEE MO], BLANK())
+
+var ausencias_extra =
+SELECTEDVALUE('Sim Ausencias'[Ausencias Extra], 0)
+
+var simulando =
+fator_demanda <> 1 || NOT ISBLANK(oee_mo_sim) || ausencias_extra <> 0
+
+-- ── HC necessário por família de mão de obra ─────────────────────────────
+-- HC necessário (por turno) = CM (h) ÷ (horas do período × OEE)
+var linhas_mo =
+ADDCOLUMNS(
+    FILTER(fCap, fCap[CATEGORIA] = "Mão de Obra"),
+    "@hc",
+    DIVIDE(
+        fCap[CM_HRS] * fator_demanda,
+        fCap[HRS_TURNO] * IF(ISBLANK(oee_mo_sim), fCap[OEE], oee_mo_sim)
+    )
+)
+
+var linhas_carreg =
+ADDCOLUMNS(linhas_mo, "@carreg", DIVIDE([@hc], fCap[RECURSO]))
+
+var turnos =
+MAX(
+    3,
+    CALCULATE(MAX(dRecurso[TURNOS]), dRecurso[CATEGORIA] = "Mão de Obra")
+)
+
+var hc_nec_total =
+SUMX(linhas_mo, [@hc]) * turnos
+
+var hc_real_total =
+SUMX(
+    FILTER(dRecurso, dRecurso[CATEGORIA] = "Mão de Obra"),
+    dRecurso[QTDE_1T] + dRecurso[QTDE_2T] + dRecurso[QTDE_3T]
+)
+
+-- ── ausências: a semana apontada na aba FAMÍLIAS, senão a média do ano ────
+var semana_ref =
+MAX(fAusencias[SEMANA_REF])
+
+var aus_da_semana =
+nivel = "Semanal" && numero = semana_ref
+
+var aus_media_ano =
+CALCULATE(SUM(fAusencias[QTDE_MEDIA_ANO]), fAusencias[TIPO] = "Total Ausências")
+
+var ausencias =
+IF(
+    aus_da_semana,
+    CALCULATE(SUM(fAusencias[QTDE_SEMANA]), fAusencias[TIPO] = "Total Ausências"),
+    aus_media_ano
+) + ausencias_extra
+
+var hc_efetivo =
+hc_real_total - ausencias
+
+-- ── indicadores ──────────────────────────────────────────────────────────
+var ocup_global =
+DIVIDE(hc_nec_total, hc_real_total)
+
+var ocup_corrigida =
+DIVIDE(hc_nec_total, hc_efetivo)
+
+var gap_hc =
+hc_nec_total - hc_real_total
+
+var gap_hc_efetivo =
+hc_nec_total - hc_efetivo
+
+var lotes =
+SUM(fDemanda[Lotes]) * fator_demanda
+
+var lotes_dia =
+DIVIDE(lotes, dias_uteis)
+
+var lotes_classificados =
+CALCULATE(SUM(fDemanda[Lotes]), fDemanda[Complexidade] IN {1, 2, 3, 4}) * fator_demanda
+
+var lotes_34 =
+CALCULATE(SUM(fDemanda[Lotes]), fDemanda[Complexidade] IN {3, 4}) * fator_demanda
+
+var perc_34 =
+DIVIDE(lotes_34, lotes_classificados)
+
+var qtd_criticas =
+COUNTROWS(FILTER(linhas_carreg, [@carreg] > 1))
+
+var top_criticas =
+CONCATENATEX(
+    TOPN(3, FILTER(linhas_carreg, [@carreg] > 1), [@carreg], DESC),
+    fCap[FAMILIA],
+    ", ",
+    [@carreg],
+    DESC
+)
+
+-- ── semáforo e veredito (sobre a ocupação corrigida) ─────────────────────
+var cor_verde = "#47B777"
+var cor_amarelo = "#DEA132"
+var cor_vermelho = "#E5564A"
+var cor_neutro = "#4F565D"
+
+var cor_semaforo =
+SWITCH(
+    TRUE(),
+    ISBLANK(ocup_corrigida), cor_neutro,
+    ocup_corrigida > 1, cor_vermelho,
+    ocup_corrigida >= 0.8, cor_amarelo,
+    cor_verde
+)
+
+var cor_global =
+SWITCH(
+    TRUE(),
+    ISBLANK(ocup_global), cor_neutro,
+    ocup_global > 1, cor_vermelho,
+    ocup_global >= 0.8, cor_amarelo,
+    cor_verde
+)
+
+var cor_gap =
+IF(gap_hc > 0, cor_vermelho, cor_verde)
+
+var cor_aus =
+IF(ausencias > aus_media_ano, cor_amarelo, cor_neutro)
+
+var cor_34 =
+IF(perc_34 > 0.7, cor_amarelo, cor_neutro)
+
+var veredito =
+SWITCH(
+    TRUE(),
+    ISBLANK(ocup_corrigida), "Sem dados suficientes",
+    ocup_corrigida <= 0.9, "Atingível com folga",
+    ocup_corrigida <= 1.1, "Atingível com baixa margem",
+    "Não atingível sem ação"
+)
+
+var faixa_semaforo =
+SWITCH(
+    TRUE(),
+    ISBLANK(ocup_corrigida), "sem dados",
+    ocup_corrigida > 1, "acima de 100%",
+    ocup_corrigida >= 0.8, "entre 80% e 100%",
+    "abaixo de 80%"
+)
+
+var acao =
+SWITCH(
+    TRUE(),
+    ocup_corrigida > 1, "Ação: reforçar ou remanejar HC para " & IF(top_criticas = "", "as famílias críticas", top_criticas) & ".",
+    ocup_corrigida >= 0.8, "Ação: acompanhar diariamente e evitar novas ausências.",
+    "Capacidade confortável para o período."
+)
+
+-- ── formatação pt-BR ─────────────────────────────────────────────────────
+var ocup_global_fmt =
+IF(ISBLANK(ocup_global), "—", FORMAT(ocup_global, "0.0%", "pt-BR"))
+
+var ocup_corrigida_fmt =
+IF(ISBLANK(ocup_corrigida), "—", FORMAT(ocup_corrigida, "0.0%", "pt-BR"))
+
+var hc_nec_fmt =
+FORMAT(hc_nec_total, "#,##0", "pt-BR")
+
+var hc_real_fmt =
+FORMAT(hc_real_total, "#,##0", "pt-BR")
+
+var gap_fmt =
+IF(gap_hc > 0, "+", "") & FORMAT(gap_hc, "#,##0", "pt-BR")
+
+var gap_efetivo_fmt =
+IF(gap_hc_efetivo > 0, "+", "") & FORMAT(gap_hc_efetivo, "#,##0", "pt-BR")
+
+var lotes_fmt =
+FORMAT(lotes, "#,##0", "pt-BR")
+
+var lotes_dia_fmt =
+IF(ISBLANK(lotes_dia), "—", FORMAT(lotes_dia, "#,##0.0", "pt-BR"))
+
+var dias_fmt =
+FORMAT(dias_uteis, "0.00", "pt-BR")
+
+var aus_fmt =
+FORMAT(ausencias, "#,##0.0", "pt-BR")
+
+var aus_ano_fmt =
+FORMAT(aus_media_ano, "#,##0.0", "pt-BR")
+
+var perc_34_fmt =
+IF(ISBLANK(perc_34), "—", FORMAT(perc_34, "0.0%", "pt-BR"))
+
+var lotes_34_fmt =
+FORMAT(lotes_34, "#,##0", "pt-BR")
+
+var origem_aus =
+IF(aus_da_semana, "semana", "média do ano")
+
+-- ── estilos reutilizados ─────────────────────────────────────────────────
+var fonte_mono =
+"font-family:Consolas,'Cascadia Mono','Courier New',monospace;"
+
+var estilo_micro =
+fonte_mono & "font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#929DA6;"
+
+var estilo_tile =
+"flex:1 1 118px;min-width:110px;box-sizing:border-box;padding:10px 12px;border-radius:8px;background:#0D1217;border:1px solid #20272D;display:flex;flex-direction:column;gap:5px;"
+
+var estilo_valor =
+fonte_mono & "font-size:24px;font-weight:600;line-height:1;color:#E3E9ED;"
+
+var estilo_detalhe =
+"font-size:10px;color:#929DA6;"
+
+var tile =
+"<div style='" & estilo_tile & "'><div style='display:flex;justify-content:space-between;align-items:center;gap:6px;'><span style='" & estilo_micro & "'>"
+
+var tile_meio =
+"</span><span style='width:8px;height:8px;border-radius:50%;flex:none;background:"
+
+var tile_valor =
+";'></span></div><div style='" & estilo_valor & "'>"
+
+var tile_detalhe =
+"</div><div style='" & estilo_detalhe & "'>"
+
+var tile_fim =
+"</div></div>"
+
+Return
+
+IF(
+    NOT periodo_ok,
+    "<div style='width:100%;height:100vh;box-sizing:border-box;padding:16px;background:#060A0E;color:#929DA6;font-family:Segoe UI;font-size:13px;'>Selecione um único período (semana ou mês) para ver os indicadores.</div>",
+
+"
+<div style='
+    width:100%;
+    height:100vh;
+    box-sizing:border-box;
+    padding:12px;
+    background:#060A0E;
+    color:#E3E9ED;
+    font-family:Segoe UI, sans-serif;
+    overflow:auto;
+'>
+
+    <!-- CABEÇALHO -->
+    <div style='display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:10px;'>
+        <div>
+            <div style='" & estilo_micro & "'>FLOW LAB · Capacidade · " & nivel & "</div>
+            <div style='font-size:16px;font-weight:600;margin-top:2px;'>" & rotulo & "</div>
+        </div>
+        <div style='" & estilo_micro & "'>" & fonte & IF(simulando, " · <span style=""color:#E29437;"">cenário simulado</span>", "") & "</div>
+    </div>
+
+    <!-- SEMÁFORO -->
+    <div style='border-radius:8px;background:#0D1217;border:1px solid #20272D;overflow:hidden;margin-bottom:10px;'>
+        <div style='display:flex;align-items:center;gap:14px;padding:12px 14px;flex-wrap:wrap;'>
+            <span style='width:14px;height:14px;border-radius:50%;flex:none;background:" & cor_semaforo & ";box-shadow:0 0 0 5px " & cor_semaforo & "33;'></span>
+            <div style='flex:1 1 280px;min-width:0;'>
+                <div style='display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;'>
+                    <span style='font-size:16px;font-weight:600;'>" & veredito & "</span>
+                    <span style='" & estilo_micro & "'>Semáforo · " & faixa_semaforo & "</span>
+                </div>
+                <div style='font-size:11px;color:#929DA6;margin-top:3px;'>
+                    Ocupação corrigida de " & ocup_corrigida_fmt & " descontando " & aus_fmt & " HC de ausência (" & origem_aus & "). " & acao & "
+                </div>
+            </div>
+            <div style='display:flex;gap:20px;'>
+                <div><div style='" & estilo_micro & "'>Ocupação</div><div style='" & fonte_mono & "font-size:20px;font-weight:600;color:" & cor_semaforo & ";'>" & ocup_corrigida_fmt & "</div></div>
+                <div><div style='" & estilo_micro & "'>Gap HC</div><div style='" & fonte_mono & "font-size:20px;font-weight:600;'>" & gap_efetivo_fmt & "</div></div>
+            </div>
+        </div>
+        <div style='display:flex;height:4px;'>
+            <span style='flex:1;background:#E5564A;'></span>
+            <span style='flex:1;background:#DEA132;'></span>
+            <span style='flex:1;background:#47B777;'></span>
+            <span style='flex:2;background:#20272D;'></span>
+        </div>
+    </div>
+
+    <!-- 8 INDICADORES -->
+    <div style='display:flex;flex-wrap:wrap;gap:8px;'>
+        " & tile & "Ocupação global" & tile_meio & cor_global & tile_valor & ocup_global_fmt & tile_detalhe & IF(ocup_global > 1, "acima da capacidade", "da capacidade") & tile_fim & "
+        " & tile & "Ocupação corrigida" & tile_meio & cor_semaforo & tile_valor & ocup_corrigida_fmt & tile_detalhe & "descontando ausências" & tile_fim & "
+        " & tile & "HC necessário" & tile_meio & cor_global & tile_valor & hc_nec_fmt & tile_detalhe & "disponível " & hc_real_fmt & " HC" & tile_fim & "
+        " & tile & "Gap de HC" & tile_meio & cor_gap & tile_valor & gap_fmt & tile_detalhe & IF(gap_hc > 0, "déficit estimado", "folga estimada") & tile_fim & "
+        " & tile & "Total de lotes" & tile_meio & cor_neutro & tile_valor & lotes_fmt & tile_detalhe & IF(fonte = "Quarentena real", "na quarentena", "programados") & tile_fim & "
+        " & tile & "Lotes/dia" & tile_meio & cor_neutro & tile_valor & lotes_dia_fmt & tile_detalhe & dias_fmt & " dias úteis" & tile_fim & "
+        " & tile & "Ausência (HC)" & tile_meio & cor_aus & tile_valor & aus_fmt & tile_detalhe & "média anual " & aus_ano_fmt & tile_fim & "
+        " & tile & "Complexidade 3+4" & tile_meio & cor_34 & tile_valor & perc_34_fmt & tile_detalhe & lotes_34_fmt & " lotes" & tile_fim & "
+    </div>
+
+    <div style='" & estilo_micro & "margin-top:10px;'>" & FORMAT(qtd_criticas, "0") & " família(s) de mão de obra acima de 100%</div>
+</div>
+"
+)
